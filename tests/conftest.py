@@ -8,7 +8,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+# basetemp=data/.pytest-tmp 的父目录不入库(.gitignore), 干净克隆必须幂等创建。
+(REPO_ROOT / "data").mkdir(exist_ok=True)
 
 from heteroforge.data.synthetic import make_graph_data  # noqa: E402
 
