@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install locked deps
+        run: pip install --only-binary=:all: -r requirements.txt
+      - name: Char gate
+        run: python scripts/scan_chars.py
+      - name: Unit tests
+        run: python -m pytest -q -W ignore tests --basetemp=data/.pytest-tmp -p no:cacheprovider
+      - name: Smoke pipeline (offline, CPU)
+        run: python scripts/verify.py --fast

@@ -1,0 +1,319 @@
+classDiagram
+    direction TB
+
+    class GraphData {
+        +int num_nodes
+        +csr_matrix adjacency
+        +ndarray features
+        +ndarray labels
+        +ndarray train_mask
+        +ndarray val_mask
+        +ndarray test_mask
+        +dict metadata
+        +validate() None
+        +node_hash() str
+        +edge_set(set_undirected) set
+        +induced(node_index) tuple
+    }
+
+    class HomophilyReport {
+        +int num_nodes
+        +int num_edges
+        +int num_classes
+        +float edge_homophily
+        +float node_homophily
+        +ndarray node_homophily_vec
+        +ndarray node_degrees
+        +int isolated_count
+        +float degree_assortativity
+        +float attribute_assortativity
+        +float class_adjusted_homophily
+        +within_target(target, tol) bool
+        +normalized_gate_features() ndarray
+    }
+
+    class ChannelOutput {
+        +str channel
+        +str backend
+        +str backend_license
+        +bool fallback_used
+        +str fallback_from
+        +ndarray embedding
+        +ndarray node_ids
+        +ndarray proba
+        +ndarray confidence
+        +ndarray computed_mask
+        +int dim
+        +int seed
+        +float elapsed_sec
+        +float peak_rss_mb
+        +dict params
+        +list warnings
+    }
+
+    class RoutingDecision {
+        +str mode
+        +float alpha_base
+        +float w_homophily
+        +float threshold
+        +float budget_ratio
+        +ndarray alpha_vec
+        +ndarray routed_mask
+        +float routed_fraction
+        +ndarray reason
+        +ndarray node_homophily
+        +str selected_by
+        +list warnings
+        +fuse(z_a, z_b, computed_mask) ndarray
+    }
+
+    class EvalResult {
+        +str task
+        +str system
+        +str dataset_id
+        +float homophily_bucket
+        +float homophily_measured
+        +int n_nodes
+        +int n_samples
+        +int seed
+        +dict metrics
+        +float elapsed_sec
+        +float peak_rss_mb
+        +float routed_fraction
+        +bool is_primary
+        +int test_touch_count
+        +str leakage_hash
+    }
+
+    class BenchmarkRow {
+        +str generator
+        +str generator_effective
+        +int n_nodes
+        +int n_edges
+        +float homophily_target
+        +float homophily_measured
+        +int num_classes
+        +str class_balance
+        +str feature_signal
+        +str task
+        +str system
+        +int seed
+        +float macro_f1
+        +float micro_f1
+        +float accuracy
+        +float roc_auc
+        +float average_precision
+        +float alpha_base
+        +float routed_fraction
+        +float budget_ratio
+        +str mode
+        +str backend_a
+        +str backend_b
+        +float elapsed_sec
+        +float peak_rss_mb
+        +str status
+        +str warning_codes
+        +str split_hash
+        +str config_hash
+    }
+
+    class SplitSpec {
+        +float train_ratio
+        +float val_ratio
+        +float test_ratio
+        +float edge_train_ratio
+        +float edge_val_ratio
+        +float edge_test_ratio
+        +bool stratify
+        +bool require_connected_train_graph
+        +str version
+    }
+
+    class RunConfig {
+        +int seed
+        +Path output_dir
+        +bool offline
+        +str task
+        +DataConfig data
+        +EmbedConfig embed
+        +GNNConfig gnn
+        +RouterConfig router
+        +HPOConfig hpo
+        +EvalConfig eval
+        +LimitsConfig limits
+        +str config_hash
+    }
+
+    class Embedder {
+        <<Protocol>>
+        +str backend_id
+        +str license_id
+        +fit_predict(graph, config) ChannelOutput
+    }
+
+    class GNNBackend {
+        <<Protocol>>
+        +str backend_id
+        +fit(graph, config, labels_mask) Self
+        +predict(graph, nodes, k_hop) ChannelOutput
+        +save(path) None
+        +load(path) Self
+    }
+
+    class Router {
+        <<Protocol>>
+        +route(graph, report, out_a, out_b, params) RoutingDecision
+        +fuse(decision, out_a, out_b) ndarray
+    }
+
+    class Evaluator {
+        <<Protocol>>
+        +str task
+        +evaluate(graph, output, config) EvalResult
+        +cross_check_sklearn(y_true, y_score) dict
+    }
+
+    class Generator {
+        <<Protocol>>
+        +str generator_id
+        +generate(n_nodes, num_classes, homophily, seed) tuple
+        +max_retry() int
+    }
+
+    class ChannelAEmbedder {
+        +str backend_id = "node2vec|spectral_rw|svd"
+        +list ladder
+        +fit_predict(graph, config) ChannelOutput
+        -_probe_backends() list
+        -_run_node2vec(graph, config) ChannelOutput
+        -_run_spectral(graph, config) ChannelOutput
+        -_run_svd(graph, config) ChannelOutput
+        -_confidence_from_proba(graph, emb) ndarray
+    }
+
+    class SGCBackend {
+        +str backend_id = "sgc|prop_lr"
+        +GNNClassifier model
+        +fit(graph, config, labels_mask) Self
+        +predict(graph, nodes, k_hop) ChannelOutput
+        -_build_layers(n_features, n_classes) list
+        -_local_forward(graph, nodes, k_hop) ndarray
+    }
+
+    class SubgraphBuilder {
+        +extract(graph, node, k_hop) tuple
+        +renumber_csr(adj, index) csr_matrix
+        +normalize(adj, scheme) csr_matrix
+    }
+
+    class HAARRouter {
+        +route(graph, report, out_a, out_b, params) RoutingDecision
+        +fuse(decision, out_a, out_b) ndarray
+        -_graph_gate(report, params) float
+        -_node_gate(report, decision) ndarray
+        -_apply_budget(confidence, budget_ratio) ndarray
+    }
+
+    class BucketTuner {
+        +int n_trials
+        +int timeout_sec
+        +str objective
+        +tune_bucket(bucket, graph, out_a, masks) RoutingParams
+        -_objective(trial) float
+    }
+
+    class NodeEvaluator {
+        +str task = "node_classification"
+        +evaluate(graph, output, config) EvalResult
+        +cross_check_sklearn(y_true, y_score) dict
+    }
+
+    class LinkEvaluator {
+        +str task = "link_prediction"
+        +split_edges(graph, spec) dict
+        +negative_sample(train_edges, degree_aware, ratio) dict
+        +score_edges(Z, pairs, operator, head) dict
+        +evaluate(graph, output, config) EvalResult
+        +cross_check_sklearn(y_true, y_score) dict
+    }
+
+    class Reporter {
+        +write_all(run_dir, bundle) None
+        +atomic_write(path, payload) None
+        +render_summary_table(rows) str
+    }
+
+    class Pipeline {
+        +RunConfig config
+        +run() EvalResult
+        -_stage_data() GraphData
+        -_stage_graph(graph) HomophilyReport
+        -_stage_split(graph) None
+        -_stage_embed_a(graph) ChannelOutput
+        -_stage_hpo(graph, report, out_a) RoutingParams
+        -_stage_gnn_b(graph, params) ChannelOutput
+        -_stage_route(...) RoutingDecision
+        -_stage_eval(...) EvalResult
+    }
+
+    class BenchmarkRunner {
+        +Pipeline pipeline
+        +iter_grid(config) Iterator
+        +run_all() dict
+        +check_haar_gate(rows) bool
+        +to_json(path) None
+        +to_csv(path) None
+    }
+
+    class HeteroForgeError {
+        +str code
+        +str message
+        +int exit_code
+        +dict context
+    }
+
+    Embedder <|.. ChannelAEmbedder
+    GNNBackend <|.. SGCBackend
+    Router <|.. HAARRouter
+    Evaluator <|.. NodeEvaluator
+    Evaluator <|.. LinkEvaluator
+    Generator <|.. SyntheticGenerator
+
+    class SyntheticGenerator {
+        +str generator_id
+        +generate(n_nodes, num_classes, homophily, seed) tuple
+        +max_retry() int
+        -_sbm(n, p_in, p_out, sizes, seed) nxGraph
+        -_lfr(n, mu, avg_degree, seed) nxGraph
+        -_calibrate_sbm(target_h, sizes, avg_degree) tuple
+    }
+
+    ChannelAEmbedder ..> ChannelOutput : produces
+    SGCBackend ..> ChannelOutput : produces
+    SGCBackend ..> SubgraphBuilder : uses
+    HAARRouter ..> ChannelOutput : consumes 2
+    HAARRouter ..> RoutingDecision : produces
+    HAARRouter ..> HomophilyReport : consumes
+    BucketTuner ..> HAARRouter : calls
+    BucketTuner ..> SGCBackend : calls
+    BucketTuner ..> NodeEvaluator : validation only
+    Pipeline ..> SyntheticGenerator : uses
+    Pipeline ..> ChannelAEmbedder : uses
+    Pipeline ..> SGCBackend : uses
+    Pipeline ..> BucketTuner : uses
+    Pipeline ..> HAARRouter : uses
+    Pipeline ..> NodeEvaluator : uses
+    Pipeline ..> LinkEvaluator : uses
+    Pipeline ..> Reporter : uses
+    Pipeline ..> BenchmarkRow : emits
+    BenchmarkRunner ..> Pipeline : drives
+    BenchmarkRunner ..> RunConfig : reads
+    Pipeline ..> RunConfig : reads
+    Pipeline ..> GraphData : builds
+    Pipeline ..> HeteroForgeError : raises
+    HAARRouter ..> HeteroForgeError : raises
+    GraphData <.. Pipeline
+    HomophilyReport <.. Pipeline
+    RoutingDecision <.. Pipeline
+    EvalResult <.. Pipeline
+    SplitSpec <.. Pipeline

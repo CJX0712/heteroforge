@@ -1,0 +1,59 @@
+# HeteroForge 包元数据。
+# 依赖边界: 主依赖段只含 BSD/MIT 组件; gensim(LGPL-2.1-only) 与 node2vec 只在 [n2v] extra 中出现。
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heteroforge"
+version = "0.1.0"
+description = "Homophily-Aware Adaptive Routing: CPU-only 双通道图学习系统"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = { text = "Apache-2.0" }
+authors = [{ name = "晨星" }]
+keywords = ["graph-learning", "homophily", "node-classification", "link-prediction", "cpu-only"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy==2.5.3",
+    "scipy==1.18.1",
+    "scikit-learn==1.9.1",
+    "networkx==3.7",
+    "scikit-network==0.33.0",
+    "optuna==5.0.0",
+    "pandas==3.0.6",
+    "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+# [n2v] 是唯一会引入 LGPL-2.1-only 组件(gensim)的安装路径, 默认不安装。
+n2v = ["node2vec==0.3.2", "gensim==4.4.0"]
+dev = ["pytest==9.1.1"]
+
+[project.scripts]
+heteroforge = "heteroforge.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["heteroforge*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "slow: 长时运行, 由 make test-slow 或 CI nightly 触发",
+    "gate: 发布阻断门槛测试",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]

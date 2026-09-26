@@ -1,0 +1,92 @@
+sequenceDiagram
+    autonumber
+    actor U as User or CI
+    participant C as cli.py
+    participant P as Pipeline
+    participant D as data.synthetic / data.split
+    participant G as graph.homophily / graph.features
+    participant A as ChannelAEmbedder
+    participant H as BucketTuner
+    participant B as SGCBackend
+    participant SB as SubgraphBuilder
+    participant R as HAARRouter
+    participant E as NodeEvaluator
+    participant LE as LinkEvaluator
+    participant W as Reporter
+
+    Note over U,W: FLOW 1 - Node Classification
+    U->>C: heteroforge benchmark run --nodes 800,2000 --homophily 0.05,0.2,0.5,0.8,0.95
+    C->>P: RunConfig(resolved, frozen, config_hash, derived seeds)
+    P->>D: generate(generator, n, num_classes=5, homophily_target, imbalance, signal, seed_data)
+    D->>D: SBM calibrate p_in/p_out or LFR mu; 3 retries then LFR to SBM warning
+    D-->>P: nx.Graph + labels
+    P->>G: build_features(signal_level) and homophily.measure(graph)
+    G-->>P: X (n,d0) + HomophilyReport
+    Note right of G: E202 if measured homophily off target by more than 0.03
+    P->>D: split_nodes(stratified 60/20/20, seed_split_node)
+    D-->>P: train/val/test masks + split_hash
+    P->>P: GraphData.validate()
+    Note right of P: E207 CSR check, E208 feature check
+    P->>A: fit_predict(graph, EmbedConfig)
+    A->>A: ladder node2vec then spectral_rw then svd
+    Note right of A: ImportError maps to E301 and W-OPTIONAL_BACKEND_UNAVAILABLE
+    A-->>P: ChannelOutput(A, z_a, proba_a, confidence_a)
+    P->>H: tune_bucket(homophily_bucket, out_a, graph, masks)
+    H->>B: fit(graph, GNNConfig, train_mask)
+    B-->>H: global SGC weights
+    loop trial = 1..20 or until 600 seconds
+        H->>B: predict(graph, nodes=candidate, k_hop=2)
+        B->>SB: extract(graph, node, k_hop) for each routed node
+        SB-->>B: induced CSR + renumbered features
+        B->>B: gnn.forward(sub_adj, sub_X)[center]
+        B-->>H: ChannelOutput(B, z_b_routed, computed_mask)
+        H->>R: route(graph, report, out_a, out_b, trial_params)
+        R-->>H: RoutingDecision(alpha_base, threshold, budget_ratio, mode)
+        H->>E: evaluate on val_mask only
+        E-->>H: val Macro-F1
+        H->>H: keep best trial; mode is also selected by validation
+    end
+    H-->>P: RoutingParams + trial history + selected_by
+    P->>B: predict(graph, nodes=routed_mask, k_hop=2)
+    B-->>P: ChannelOutput(B, sgc, z_b, computed_mask=routed_mask)
+    P->>R: route(graph, report, out_a, out_b, final_params)
+    R-->>P: RoutingDecision(alpha_vec, reason, routed_fraction, mode)
+    P->>R: fuse(decision, out_a, out_b)
+    Note right of R: E505 if a row not in computed_mask is read
+    R-->>P: fused Z (n,d)
+    P->>E: evaluate(graph, Z, test_mask)
+    E->>E: cross_check_sklearn(y_true, y_score)
+    E-->>P: EvalResult(macro_f1, micro_f1, accuracy)
+    P->>P: HAAR gate haar >= max(single_a, single_b) - 0.005
+    Note right of P: otherwise E602 with real numbers recorded
+    P->>W: write tmp then verify checksum then atomic replace
+    W-->>U: metrics.json, predictions.csv, routes.csv, env.json, summary.csv
+    U-->>P: exit 0 on OK or WARN, non-zero on E1xx..E6xx
+
+    Note over U,W: FLOW 2 - Link Prediction
+    U->>C: heteroforge eval link --homophily 0.2 --nodes 800
+    C->>P: RunConfig(task=link_prediction, offline=True)
+    P->>D: generate(...)
+    D-->>P: nx.Graph
+    Note right of P: assert connected otherwise E203
+    P->>LE: split_edges(graph, SplitSpec(0.7/0.15/0.15))
+    LE->>LE: spanning tree -> protected edge set
+    LE->>LE: sample val and test from non-protected edges
+    LE->>LE: assert is_connected(train_graph) and disjoint sets
+    LE-->>P: train/val/test edge lists as canonical min-max tuples
+    P->>LE: negative_sample(train_edges, degree_aware=True, ratio=1.0)
+    LE->>LE: degree buckets; resample until no collision with any positive edge
+    LE-->>P: pair sets with positive-negative ratio 1:1
+    P->>P: train_adjacency = CSR from train edges only
+    P->>A: fit_predict(GraphData(train_adjacency, X, y), EmbedConfig)
+    A-->>P: ChannelOutput(A, z_a, confidence_a)
+    P->>B: fit(train_graph) then predict(train_graph, nodes=routed, k_hop=2)
+    B-->>P: ChannelOutput(B, z_b, computed_mask)
+    P->>R: route(...) then fuse(...)
+    R-->>P: fused Z
+    P->>LE: score_edges(Z, pairs, operator=hadamard, head=LogisticRegression)
+    LE->>LE: fit head on train pairs, score val and test pairs
+    LE->>LE: cross_check_sklearn via roc_auc_score and average_precision_score
+    LE-->>P: EvalResult(roc_auc, average_precision)
+    P->>W: atomic write artifacts
+    W-->>U: exit 0 or non-zero

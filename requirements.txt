@@ -1,0 +1,12 @@
+# HeteroForge 核心依赖(BSD-3-Clause / MIT only), 版本为 pin, 安装使用 --only-binary=:all:
+# 本文件禁止出现 gensim / node2vec / torch / karateclub, 由 tests/test_system.py 断言。
+# 版本与 requirements.lock.txt 对齐。
+numpy==2.5.3
+scipy==1.18.1
+scikit-learn==1.9.1
+networkx==3.7
+scikit-network==0.33.5
+optuna==5.0.0
+pandas==3.0.6
+PyYAML==6.0.3
+pytest==9.1.1
