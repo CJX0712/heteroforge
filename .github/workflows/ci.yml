@@ -26,4 +26,3 @@ jobs:
         run: python -m pytest -q -W ignore tests --basetemp=data/.pytest-tmp -p no:cacheprovider
       - name: Smoke pipeline (offline, CPU)
         run: python scripts/verify.py --fast
-# refreshed 2026-10-05 to surface the 2026-09-26 failure
