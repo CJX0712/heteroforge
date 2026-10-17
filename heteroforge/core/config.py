@@ -141,7 +141,11 @@ class RunConfig:
         out: dict[str, Any] = {}
         for item in fields(self):
             value = getattr(self, item.name)
-            out[item.name] = value if isinstance(value, (str, int, float, bool)) else dict(vars(value))
+            out[item.name] = (
+                value
+                if isinstance(value, (str, int, float, bool))
+                else dict(vars(value))
+            )
         return out
 
 
@@ -155,7 +159,14 @@ _SECTION_TYPES: dict[str, type] = {
     "limits": LimitsConfig,
 }
 
-_TOP_KEYS: set[str] = {"seed", "task", "offline", "output_dir", "schema_version", *_SECTION_TYPES.keys()}
+_TOP_KEYS: set[str] = {
+    "seed",
+    "task",
+    "offline",
+    "output_dir",
+    "schema_version",
+    *_SECTION_TYPES.keys(),
+}
 
 
 def load_yaml(path: Path | str) -> dict[str, Any]:
@@ -167,15 +178,23 @@ def load_yaml(path: Path | str) -> dict[str, Any]:
         text = target.read_text(encoding="utf-8")
         data = yaml.safe_load(text)
     except ImportError as exc:
-        raise HeteroForgeError("E104", "PyYAML unavailable", {"path": str(target)}) from exc
+        raise HeteroForgeError(
+            "E104", "PyYAML unavailable", {"path": str(target)}
+        ) from exc
     except OSError as exc:
-        raise HeteroForgeError("E104", "config unreadable", {"path": str(target)}) from exc
+        raise HeteroForgeError(
+            "E104", "config unreadable", {"path": str(target)}
+        ) from exc
     except Exception as exc:
-        raise HeteroForgeError("E104", "yaml parse failed", {"path": str(target)}) from exc
+        raise HeteroForgeError(
+            "E104", "yaml parse failed", {"path": str(target)}
+        ) from exc
     if data is None:
         return {}
     if not isinstance(data, dict):
-        raise HeteroForgeError("E104", "yaml root must be a mapping", {"path": str(target)})
+        raise HeteroForgeError(
+            "E104", "yaml root must be a mapping", {"path": str(target)}
+        )
     return data
 
 
@@ -201,33 +220,57 @@ def _check_unknown_keys(payload: dict[str, Any]) -> None:
         allowed = {f.name for f in fields(_SECTION_TYPES[section])}
         unknown = sorted(set(payload_section.keys()) - allowed)
         if unknown:
-            raise HeteroForgeError("E101", f"unknown keys in section {section}", {"keys": unknown})
+            raise HeteroForgeError(
+                "E101", f"unknown keys in section {section}", {"keys": unknown}
+            )
 
 
 def _validate_bounds(cfg: RunConfig) -> None:
     """越界校验, 任一违反抛 E102。"""
-    for name, value in (("alpha_base", cfg.routing.alpha_base), ("threshold", cfg.routing.threshold)):
+    for name, value in (
+        ("alpha_base", cfg.routing.alpha_base),
+        ("threshold", cfg.routing.threshold),
+    ):
         if not 0.0 <= float(value) <= 1.0:
-            raise HeteroForgeError("E102", f"routing.{name} must be in [0,1]", {"value": value})
+            raise HeteroForgeError(
+                "E102", f"routing.{name} must be in [0,1]", {"value": value}
+            )
     if not 0.0 < float(cfg.routing.budget_ratio) <= 1.0:
-        raise HeteroForgeError("E102", "routing.budget_ratio must be in (0,1]",
-                               {"value": cfg.routing.budget_ratio})
+        raise HeteroForgeError(
+            "E102",
+            "routing.budget_ratio must be in (0,1]",
+            {"value": cfg.routing.budget_ratio},
+        )
     if not 0.0 <= float(cfg.routing.w_homophily) <= 4.0:
-        raise HeteroForgeError("E102", "routing.w_homophily must be in [0,4]",
-                               {"value": cfg.routing.w_homophily})
+        raise HeteroForgeError(
+            "E102",
+            "routing.w_homophily must be in [0,4]",
+            {"value": cfg.routing.w_homophily},
+        )
     if cfg.routing.mode not in ("cascade", "full_dual"):
-        raise HeteroForgeError("E102", "routing.mode invalid", {"value": cfg.routing.mode})
+        raise HeteroForgeError(
+            "E102", "routing.mode invalid", {"value": cfg.routing.mode}
+        )
     if not 0.0 <= float(cfg.data.homophily) <= 1.0:
-        raise HeteroForgeError("E102", "data.homophily must be in [0,1]", {"value": cfg.data.homophily})
+        raise HeteroForgeError(
+            "E102", "data.homophily must be in [0,1]", {"value": cfg.data.homophily}
+        )
     if int(cfg.data.n_nodes) < 2:
-        raise HeteroForgeError("E102", "data.n_nodes must be >= 2", {"value": cfg.data.n_nodes})
+        raise HeteroForgeError(
+            "E102", "data.n_nodes must be >= 2", {"value": cfg.data.n_nodes}
+        )
     if int(cfg.data.num_classes) < 2:
-        raise HeteroForgeError("E102", "data.num_classes must be >= 2", {"value": cfg.data.num_classes})
+        raise HeteroForgeError(
+            "E102", "data.num_classes must be >= 2", {"value": cfg.data.num_classes}
+        )
     if int(cfg.embed.dim) < 1 or int(cfg.features.dim) < 1:
         raise HeteroForgeError("E102", "dim must be >= 1")
     if int(cfg.embed.workers) != 1:
-        raise HeteroForgeError("E102", "embed.workers must be 1 for reproducibility (K15)",
-                               {"value": cfg.embed.workers})
+        raise HeteroForgeError(
+            "E102",
+            "embed.workers must be 1 for reproducibility (K15)",
+            {"value": cfg.embed.workers},
+        )
 
 
 def build_run_config(override: dict[str, Any] | None = None) -> RunConfig:
@@ -246,8 +289,11 @@ def build_run_config(override: dict[str, Any] | None = None) -> RunConfig:
     _check_unknown_keys(payload)
     version = str(payload.get("schema_version", SCHEMA_VERSION))
     if version != SCHEMA_VERSION:
-        raise HeteroForgeError("E103", "schema_version mismatch",
-                               {"expected": SCHEMA_VERSION, "got": version})
+        raise HeteroForgeError(
+            "E103",
+            "schema_version mismatch",
+            {"expected": SCHEMA_VERSION, "got": version},
+        )
     cfg = RunConfig(
         seed=int(payload.get("seed", 42)),
         task=str(payload.get("task", "node_classification")),

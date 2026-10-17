@@ -17,4 +17,4 @@ from heteroforge.router.haar import (
     default_alpha_fn,
 )
 
-__all__ = ["HAARRouter", "default_alpha_fn", "assert_no_test_access"]
+__all__ = ["HAARRouter", "assert_no_test_access", "default_alpha_fn"]

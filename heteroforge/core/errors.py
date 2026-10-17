@@ -170,8 +170,12 @@ class HeteroForgeError(Exception):
         detail: 结构化上下文, 便于写 artifact 与排查。
     """
 
-    def __init__(self, errcode: str, message: str, detail: dict[str, Any] | None = None) -> None:
-        super().__init__(f"{errcode} {ERROR_DESCRIPTIONS.get(errcode, 'UNKNOWN')}: {message}")
+    def __init__(
+        self, errcode: str, message: str, detail: dict[str, Any] | None = None
+    ) -> None:
+        super().__init__(
+            f"{errcode} {ERROR_DESCRIPTIONS.get(errcode, 'UNKNOWN')}: {message}"
+        )
         self.errcode = errcode
         self.message = message
         self.detail: dict[str, Any] = detail if detail is not None else {}

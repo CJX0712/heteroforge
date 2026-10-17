@@ -17,13 +17,12 @@ Example:
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 
-from heteroforge.core.config import EmbedConfig, GNNConfig, RoutingParams, RunConfig
+from heteroforge.core.config import GNNConfig, RoutingParams
 from heteroforge.core.errors import HeteroForgeError
 from heteroforge.core.types import ChannelOutput, GraphData, HomophilyReport
 from heteroforge.core.utils import derive_seed
@@ -37,10 +36,20 @@ DEFAULT_TIMEOUT_SEC = 300.0
 # 强制入队保证 HPO 结果在 val 上不低于最佳单通道(非劣性 by construction),
 # TPE 自由搜索只负责在端点之间找更优的融合配置。
 _ENDPOINT_TRIALS: list[dict[str, Any]] = [
-    {"mode": "cascade", "alpha_base": 1.0, "w_homophily": 0.0,
-     "threshold": 0.2, "budget_ratio": 1.0},
-    {"mode": "full_dual", "alpha_base": 0.0, "w_homophily": 0.0,
-     "threshold": 0.2, "budget_ratio": 1.0},
+    {
+        "mode": "cascade",
+        "alpha_base": 1.0,
+        "w_homophily": 0.0,
+        "threshold": 0.2,
+        "budget_ratio": 1.0,
+    },
+    {
+        "mode": "full_dual",
+        "alpha_base": 0.0,
+        "w_homophily": 0.0,
+        "threshold": 0.2,
+        "budget_ratio": 1.0,
+    },
 ]
 
 
@@ -106,7 +115,7 @@ def tune_routing(
     """
     assert_no_test_access("train_mask", "val_mask")
     base = base_params if base_params is not None else RoutingParams()
-    gcfg = gnn_config if gnn_config is not None else GNNConfig()
+    gnn_config if gnn_config is not None else GNNConfig()
     hpo_seed = derive_seed(int(seed), "hpo")
     router = HAARRouter()
 
@@ -117,19 +126,27 @@ def tune_routing(
         if routed_idx.size == 0:
             return 0.0
         out_b = gnn_backend.predict(graph, nodes=routed_idx, k_hop=int(params.k_hop))
-        fused = decision.fuse(out_a.fusion_matrix(), out_b.fusion_matrix(), out_b.computed_mask)
+        fused = decision.fuse(
+            out_a.fusion_matrix(), out_b.fusion_matrix(), out_b.computed_mask
+        )
         y_true, y_pred = head_predictions(
-            fused, graph, fit_mask=graph.train_mask, pred_mask=graph.val_mask, max_iter=max_iter
+            fused,
+            graph,
+            fit_mask=graph.train_mask,
+            pred_mask=graph.val_mask,
+            max_iter=max_iter,
         )
         if y_true.size == 0:
             return 0.0
-        from heteroforge.core.errors import HeteroForgeError as _E
         from sklearn.metrics import f1_score as _sk_f1
 
         return float(_sk_f1(y_true, y_pred, average="macro", zero_division=0))
 
     warnings: list[str] = []
-    study_summary: dict[str, Any] = {"n_trials": int(n_trials), "timeout_sec": float(timeout_sec)}
+    study_summary: dict[str, Any] = {
+        "n_trials": int(n_trials),
+        "timeout_sec": float(timeout_sec),
+    }
     try:
         import optuna
 
@@ -139,7 +156,9 @@ def tune_routing(
         if float(timeout_sec) > 0:
             for endpoint in _ENDPOINT_TRIALS:
                 study.enqueue_trial(dict(endpoint))
-            study.optimize(objective, n_trials=int(n_trials), timeout=float(timeout_sec), n_jobs=1)
+            study.optimize(
+                objective, n_trials=int(n_trials), timeout=float(timeout_sec), n_jobs=1
+            )
         else:
             study_summary["skipped"] = "timeout_sec <= 0"
     except HeteroForgeError:
@@ -148,7 +167,9 @@ def tune_routing(
         warnings.append("HPO_FALLBACK")
         study_summary["error"] = f"{type(exc).__name__}: {exc}"[:200]
         return HPOResult(
-            params=RoutingParams(mode=base.mode, k_hop=base.k_hop, selected_by="default"),
+            params=RoutingParams(
+                mode=base.mode, k_hop=base.k_hop, selected_by="default"
+            ),
             study_summary=study_summary,
             selected_by="default",
             warnings=sorted(set(warnings)),
@@ -158,7 +179,9 @@ def tune_routing(
     if completed == 0:
         warnings.append("HPO_FALLBACK")
         return HPOResult(
-            params=RoutingParams(mode=base.mode, k_hop=base.k_hop, selected_by="default"),
+            params=RoutingParams(
+                mode=base.mode, k_hop=base.k_hop, selected_by="default"
+            ),
             study_summary=study_summary,
             selected_by="default",
             warnings=sorted(set(warnings)),

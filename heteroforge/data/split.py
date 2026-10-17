@@ -62,15 +62,20 @@ def split_nodes(
         members = idx[labels[idx] == cls]
         rng.shuffle(members)
         k = members.size
-        n_train = int(round(k * spec.train_ratio))
-        n_val = int(round(k * spec.val_ratio))
+        n_train = round(k * spec.train_ratio)
+        n_val = round(k * spec.val_ratio)
         n_train = min(max(n_train, 1 if k >= 3 else 0), k)
         n_val = min(max(n_val, 1 if k >= 3 else 0), k - n_train)
         if n_train + n_val > k:
             n_val = k - n_train
         n_test = k - n_train - n_val
-        pools.append((members[:n_train], members[n_train:n_train + n_val],
-                      members[n_train + n_val:n_train + n_val + n_test]))
+        pools.append(
+            (
+                members[:n_train],
+                members[n_train : n_train + n_val],
+                members[n_train + n_val : n_train + n_val + n_test],
+            )
+        )
     for tr, va, te in pools:
         train_mask[tr] = True
         val_mask[va] = True
@@ -79,21 +84,29 @@ def split_nodes(
         merged = np.flatnonzero(train_mask | val_mask | test_mask)
         rng.shuffle(merged)
         k = merged.size
-        n_train = int(round(k * spec.train_ratio))
-        n_val = int(round(k * spec.val_ratio))
+        n_train = round(k * spec.train_ratio)
+        n_val = round(k * spec.val_ratio)
         train_mask[:] = False
         val_mask[:] = False
         test_mask[:] = False
         train_mask[merged[:n_train]] = True
-        val_mask[merged[n_train:n_train + n_val]] = True
-        test_mask[merged[n_train + n_val:]] = True
-    return (np.ascontiguousarray(train_mask), np.ascontiguousarray(val_mask),
-            np.ascontiguousarray(test_mask))
+        val_mask[merged[n_train : n_train + n_val]] = True
+        test_mask[merged[n_train + n_val :]] = True
+    return (
+        np.ascontiguousarray(train_mask),
+        np.ascontiguousarray(val_mask),
+        np.ascontiguousarray(test_mask),
+    )
 
 
-def split_hash(train_mask: np.ndarray, val_mask: np.ndarray, test_mask: np.ndarray) -> str:
+def split_hash(
+    train_mask: np.ndarray, val_mask: np.ndarray, test_mask: np.ndarray
+) -> str:
     """对三个 mask 求稳定哈希; 同 seed 同数据恒定。"""
-    payload = [np.flatnonzero(np.asarray(m, dtype=bool)).tolist() for m in (train_mask, val_mask, test_mask)]
+    payload = [
+        np.flatnonzero(np.asarray(m, dtype=bool)).tolist()
+        for m in (train_mask, val_mask, test_mask)
+    ]
     return stable_hash(payload, 16)
 
 
@@ -108,7 +121,9 @@ class EdgeSplit:
     num_edges_total: int = 0
     warnings: list[str] = field(default_factory=list)
 
-    def sets(self) -> tuple[set[tuple[int, int]], set[tuple[int, int]], set[tuple[int, int]]]:
+    def sets(
+        self,
+    ) -> tuple[set[tuple[int, int]], set[tuple[int, int]], set[tuple[int, int]]]:
         """返回三组边的规范集合, 用于 E205 互斥校验。"""
         return (
             {(int(a), int(b)) for a, b in self.train_edges},
@@ -140,7 +155,11 @@ def split_edges(
     Returns:
         EdgeSplit, 三组边均为 (k,2) int64 规范 (min,max) 元组。
     """
-    need_connected = spec.require_connected_train_graph if require_connected is None else require_connected
+    need_connected = (
+        spec.require_connected_train_graph
+        if require_connected is None
+        else require_connected
+    )
     if isinstance(graph, sp.csr_matrix):
         adjacency = graph
         n_nodes = adjacency.shape[0]
@@ -149,7 +168,9 @@ def split_edges(
     else:
         nx_graph = graph
         n_nodes = graph.number_of_nodes()
-        adjacency = nx.to_scipy_sparse_array(graph, nodelist=sorted(graph.nodes()), format="csr")
+        adjacency = nx.to_scipy_sparse_array(
+            graph, nodelist=sorted(graph.nodes()), format="csr"
+        )
         edges = canonical_edges(sp.csr_matrix(adjacency))
     if edges.shape[0] == 0:
         raise HeteroForgeError("E203", "graph has no edges to split")
@@ -167,13 +188,15 @@ def split_edges(
         raise HeteroForgeError("E203", "all edges are protected by spanning tree")
     order = rng.permutation(candidates.shape[0])
     shuffled = candidates[order]
-    n_val = int(round(edges.shape[0] * spec.edge_val_ratio))
-    n_test = int(round(edges.shape[0] * spec.edge_test_ratio))
+    n_val = round(edges.shape[0] * spec.edge_val_ratio)
+    n_test = round(edges.shape[0] * spec.edge_test_ratio)
     n_val = min(n_val, shuffled.shape[0])
     n_test = min(n_test, shuffled.shape[0] - n_val)
     val_edges = shuffled[:n_val]
-    test_edges = shuffled[n_val:n_val + n_test]
-    holdout = {(int(a), int(b)) for a, b in np.vstack([val_edges, test_edges]).reshape(-1, 2)}
+    test_edges = shuffled[n_val : n_val + n_test]
+    holdout = {
+        (int(a), int(b)) for a, b in np.vstack([val_edges, test_edges]).reshape(-1, 2)
+    }
     train_edges = np.asarray(
         [e for e in edges if (int(e[0]), int(e[1])) not in holdout], dtype=np.int64
     ).reshape(-1, 2)
@@ -191,11 +214,15 @@ def split_edges(
         train_graph.add_nodes_from(range(n_nodes))
         train_graph.add_edges_from((int(a), int(b)) for a, b in train_edges)
         if not nx.is_connected(train_graph):
-            raise HeteroForgeError("E203", "train graph is not connected after edge split")
+            raise HeteroForgeError(
+                "E203", "train graph is not connected after edge split"
+            )
     return result
 
 
-def train_adjacency_from_split(adjacency: sp.csr_matrix, split: EdgeSplit) -> sp.csr_matrix:
+def train_adjacency_from_split(
+    adjacency: sp.csr_matrix, split: EdgeSplit
+) -> sp.csr_matrix:
     """仅保留 train_edges 的 CSR, 供 embedding 使用(禁止看到 holdout 边)。"""
     n = adjacency.shape[0]
     coo = sp.coo_matrix(

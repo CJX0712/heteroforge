@@ -22,8 +22,13 @@ from heteroforge.core.utils import atomic_write_json
 from heteroforge.pipeline.pipeline import HeteroForgePipeline
 
 DEFAULT_BUCKETS: tuple[tuple[int, float], ...] = (
-    (800, 0.05), (800, 0.2), (800, 0.5), (800, 0.8), (800, 0.95),
-    (2000, 0.2), (2000, 0.8),
+    (800, 0.05),
+    (800, 0.2),
+    (800, 0.5),
+    (800, 0.8),
+    (800, 0.95),
+    (2000, 0.2),
+    (2000, 0.8),
 )
 # 非劣容差: val 切分在 n=800/5 类时约 160 个验证样本, macro-F1 采样噪声实测量级
 # 为 +-0.02; 门槛目的是防回归(真回归必挂、数值抖动不挂), 故取 0.02 而非理想值。
@@ -58,31 +63,47 @@ def haar_gate_check(rows: list[dict[str, Any]]) -> dict[str, Any]:
         haar = scores.get("haar")
         # 门槛对比域 = 图通道(channel_a/channel_b)。feat_only 是无图参考线,
         # 不参与 HAAR 非劣判定(否则任何图方法都无法在强特征场景通过门槛)。
-        singles = [v for k, v in scores.items()
-                   if k in ("channel_a", "channel_b") and v is not None]
+        singles = [
+            v
+            for k, v in scores.items()
+            if k in ("channel_a", "channel_b") and v is not None
+        ]
         best_single = max(singles) if singles else None
         ok = (
-            haar is not None and best_single is not None
+            haar is not None
+            and best_single is not None
             and haar >= best_single - NONINFERIOR_TOL
         )
-        per_bucket.append({
-            "task": task, "n_nodes": n, "homophily": h, "haar": haar,
-            "best_single": best_single, "noninferior": bool(ok),
-        })
+        per_bucket.append(
+            {
+                "task": task,
+                "n_nodes": n,
+                "homophily": h,
+                "haar": haar,
+                "best_single": best_single,
+                "noninferior": bool(ok),
+            }
+        )
         if haar is not None and best_single is not None:
             means["haar"].append(haar)
             means["best_single"].append(best_single)
     mean_haar = sum(means["haar"]) / len(means["haar"]) if means["haar"] else None
     mean_single = (
-        sum(means["best_single"]) / len(means["best_single"]) if means["best_single"] else None
+        sum(means["best_single"]) / len(means["best_single"])
+        if means["best_single"]
+        else None
     )
     mean_noninferior = (
-        mean_haar is not None and mean_single is not None
+        mean_haar is not None
+        and mean_single is not None
         and mean_haar >= mean_single - NONINFERIOR_TOL
     )
     better_buckets = sum(
-        1 for b in per_bucket
-        if b["haar"] is not None and b["best_single"] is not None and b["haar"] > b["best_single"]
+        1
+        for b in per_bucket
+        if b["haar"] is not None
+        and b["best_single"] is not None
+        and b["haar"] > b["best_single"]
     )
     return {
         "per_bucket": per_bucket,
@@ -90,7 +111,9 @@ def haar_gate_check(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "mean_best_single": mean_single,
         "mean_noninferior": bool(mean_noninferior),
         "strictly_better_bucket_count": int(better_buckets),
-        "noninferior_all": all(b["noninferior"] for b in per_bucket) if per_bucket else False,
+        "noninferior_all": all(b["noninferior"] for b in per_bucket)
+        if per_bucket
+        else False,
         "tolerance": NONINFERIOR_TOL,
     }
 
@@ -109,12 +132,17 @@ def enforce_haar_gate(report: dict[str, Any]) -> None:
         )
     if not report.get("mean_noninferior", False):
         raise HeteroForgeError(
-            "E603", "HAAR mean not noninferior to best single channel",
-            {"mean_haar": report.get("mean_haar"), "mean_single": report.get("mean_best_single")},
+            "E603",
+            "HAAR mean not noninferior to best single channel",
+            {
+                "mean_haar": report.get("mean_haar"),
+                "mean_single": report.get("mean_best_single"),
+            },
         )
     if int(report.get("strictly_better_bucket_count", 0)) < 1:
         raise HeteroForgeError(
-            "E603", "HAAR shows no strictly better bucket (no adaptive gain evidence)",
+            "E603",
+            "HAAR shows no strictly better bucket (no adaptive gain evidence)",
             {"count": 0},
         )
 

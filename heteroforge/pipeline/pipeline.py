@@ -88,7 +88,9 @@ class HeteroForgePipeline:
         ).fit(graph, g, labels_mask=graph.train_mask)
 
     # ------------------------------------------------------ node classification
-    def run_node_classification(self, n_nodes: int, homophily: float) -> list[dict[str, Any]]:
+    def run_node_classification(
+        self, n_nodes: int, homophily: float
+    ) -> list[dict[str, Any]]:
         """单桶节点分类: 全系统对照 + HAAR 门槛原始数据。"""
         cfg = self.config
         started = time.perf_counter()
@@ -104,8 +106,13 @@ class HeteroForgePipeline:
         out_b_full = gnn.predict(graph, nodes=None, k_hop=int(cfg.gnn.k_hop))
 
         hpo = tune_routing(
-            graph, report, out_a, gnn, seed=int(cfg.seed),
-            gnn_config=cfg.gnn, max_iter=int(cfg.eval.max_iter),
+            graph,
+            report,
+            out_a,
+            gnn,
+            seed=int(cfg.seed),
+            gnn_config=cfg.gnn,
+            max_iter=int(cfg.eval.max_iter),
         )
         router = HAARRouter()
         decision = router.route(graph, report, out_a, None, hpo.params)
@@ -120,7 +127,10 @@ class HeteroForgePipeline:
         reps: dict[str, tuple[np.ndarray, float]] = {
             "haar": (fused, float(decision.routed_fraction)),
             "channel_a": (np.asarray(out_a.fusion_matrix(), dtype=np.float64), 0.0),
-            "channel_b": (np.asarray(out_b_full.fusion_matrix(), dtype=np.float64), 0.0),
+            "channel_b": (
+                np.asarray(out_b_full.fusion_matrix(), dtype=np.float64),
+                0.0,
+            ),
             "feat_only": (np.asarray(graph.features, dtype=np.float64), 0.0),
         }
         peak = stop_peak_sampling()
@@ -128,21 +138,37 @@ class HeteroForgePipeline:
         for system in NODE_SYSTEMS:
             rep, routed_fraction = reps[system]
             result = evaluate_representation(
-                rep, graph, system=system, dataset_id=dataset_id,
+                rep,
+                graph,
+                system=system,
+                dataset_id=dataset_id,
                 homophily_bucket=float(homophily),
                 homophily_measured=float(report.edge_homophily),
-                seed=int(cfg.seed), routed_fraction=routed_fraction,
-                elapsed_sec=0.0, peak_rss_mb=float(peak),
+                seed=int(cfg.seed),
+                routed_fraction=routed_fraction,
+                elapsed_sec=0.0,
+                peak_rss_mb=float(peak),
             )
             row = self._to_row(
-                result.metrics, task="node_classification", system=system,
-                graph=graph, report=report, n_nodes=n_nodes, homophily=homophily,
-                seed=int(cfg.seed), routed_fraction=routed_fraction,
-                mode=str(hpo.params.mode), budget_ratio=float(hpo.params.budget_ratio),
+                result.metrics,
+                task="node_classification",
+                system=system,
+                graph=graph,
+                report=report,
+                n_nodes=n_nodes,
+                homophily=homophily,
+                seed=int(cfg.seed),
+                routed_fraction=routed_fraction,
+                mode=str(hpo.params.mode),
+                budget_ratio=float(hpo.params.budget_ratio),
                 alpha_base=float(decision.alpha_base),
-                backend_a=str(out_a.backend), backend_b=str(gnn.backend_id),
-                elapsed=float(result.elapsed_sec), peak=float(peak),
-                warning_codes=self._warnings_for(system, out_a, gnn, hpo.warnings, decision),
+                backend_a=str(out_a.backend),
+                backend_b=str(gnn.backend_id),
+                elapsed=float(result.elapsed_sec),
+                peak=float(peak),
+                warning_codes=self._warnings_for(
+                    system, out_a, gnn, hpo.warnings, decision
+                ),
                 hpo_selected_by=str(hpo.selected_by),
             )
             row["hpo"] = {
@@ -151,26 +177,34 @@ class HeteroForgePipeline:
                 "best_value": hpo.study_summary.get("best_value"),
             }
             rows.append(row)
-        rows.append({
-            "task": "node_classification", "kind": "meta",
-            "dataset_id": dataset_id, "n_nodes": int(n_nodes),
-            "homophily_bucket": float(homophily),
-            "homophily_measured": float(report.edge_homophily),
-            "alpha_base": float(decision.alpha_base),
-            "routed_fraction": float(decision.routed_fraction),
-            "mode": str(hpo.params.mode),
-            "threshold": float(hpo.params.threshold),
-            "budget_ratio": float(hpo.params.budget_ratio),
-            "elapsed_total_sec": float(time.perf_counter() - started),
-            "peak_rss_mb": float(peak),
-            "seed": int(cfg.seed),
-            "config_hash": config_hash(cfg),
-            "split_hash": split_hash(graph.train_mask, graph.val_mask, graph.test_mask),
-        })
+        rows.append(
+            {
+                "task": "node_classification",
+                "kind": "meta",
+                "dataset_id": dataset_id,
+                "n_nodes": int(n_nodes),
+                "homophily_bucket": float(homophily),
+                "homophily_measured": float(report.edge_homophily),
+                "alpha_base": float(decision.alpha_base),
+                "routed_fraction": float(decision.routed_fraction),
+                "mode": str(hpo.params.mode),
+                "threshold": float(hpo.params.threshold),
+                "budget_ratio": float(hpo.params.budget_ratio),
+                "elapsed_total_sec": float(time.perf_counter() - started),
+                "peak_rss_mb": float(peak),
+                "seed": int(cfg.seed),
+                "config_hash": config_hash(cfg),
+                "split_hash": split_hash(
+                    graph.train_mask, graph.val_mask, graph.test_mask
+                ),
+            }
+        )
         return rows
 
     # --------------------------------------------------------- link prediction
-    def run_link_prediction(self, n_nodes: int, homophily: float) -> list[dict[str, Any]]:
+    def run_link_prediction(
+        self, n_nodes: int, homophily: float
+    ) -> list[dict[str, Any]]:
         """单桶链路预测: 生成树保护切分 + degree-aware negatives。"""
         cfg = self.config
         started = time.perf_counter()
@@ -197,10 +231,22 @@ class HeteroForgePipeline:
         # 链路预测的配置选择在 val 边上进行(架构 12.4 validation_mode_select):
         # 端点纯A/纯B + 默认融合, 三者 val AUC 择优, test 只触碰一次。
         cand_params: dict[str, RoutingParams] = {
-            "pure_a": RoutingParams(mode="cascade", alpha_base=1.0, w_homophily=0.0,
-                                    threshold=0.2, budget_ratio=1.0, selected_by="validation_mode_select"),
-            "pure_b": RoutingParams(mode="full_dual", alpha_base=0.0, w_homophily=0.0,
-                                    threshold=0.2, budget_ratio=1.0, selected_by="validation_mode_select"),
+            "pure_a": RoutingParams(
+                mode="cascade",
+                alpha_base=1.0,
+                w_homophily=0.0,
+                threshold=0.2,
+                budget_ratio=1.0,
+                selected_by="validation_mode_select",
+            ),
+            "pure_b": RoutingParams(
+                mode="full_dual",
+                alpha_base=0.0,
+                w_homophily=0.0,
+                threshold=0.2,
+                budget_ratio=1.0,
+                selected_by="validation_mode_select",
+            ),
             "haar_default": RoutingParams(selected_by="default"),
         }
         val_seed = int(derive_seed(cfg.seed, "eval"))
@@ -208,19 +254,28 @@ class HeteroForgePipeline:
         for name, params in cand_params.items():
             decision_c = router.route(train_graph, report, out_a, None, params)
             routed_c = np.flatnonzero(decision_c.routed_mask)
-            out_b_c = gnn.predict(train_graph, nodes=routed_c, k_hop=int(cfg.routing.k_hop))
+            out_b_c = gnn.predict(
+                train_graph, nodes=routed_c, k_hop=int(cfg.routing.k_hop)
+            )
             fused_c = decision_c.fuse(
                 out_a.fusion_matrix(), out_b_c.fusion_matrix(), out_b_c.computed_mask
             )
             val_auc = evaluate_link_prediction(
-                fused_c, train_adj, edge_split.val_edges,
-                negative_ratio=float(cfg.eval.negative_ratio), seed=val_seed,
+                fused_c,
+                train_adj,
+                edge_split.val_edges,
+                negative_ratio=float(cfg.eval.negative_ratio),
+                seed=val_seed,
             )["roc_auc"]
             if best is None or val_auc > best["val_auc"]:
                 best = {
-                    "name": name, "val_auc": float(val_auc), "decision": decision_c,
-                    "fused": fused_c, "routed_fraction": float(decision_c.routed_fraction),
-                    "mode": str(decision_c.mode), "alpha_base": float(decision_c.alpha_base),
+                    "name": name,
+                    "val_auc": float(val_auc),
+                    "decision": decision_c,
+                    "fused": fused_c,
+                    "routed_fraction": float(decision_c.routed_fraction),
+                    "mode": str(decision_c.mode),
+                    "alpha_base": float(decision_c.alpha_base),
                     "budget_ratio": float(params.budget_ratio),
                 }
         decision = best["decision"]
@@ -234,42 +289,59 @@ class HeteroForgePipeline:
         rows: list[dict[str, Any]] = []
         for system in LINK_SYSTEMS:
             metrics = evaluate_link_prediction(
-                reps[system], train_adj, edge_split.test_edges,
+                reps[system],
+                train_adj,
+                edge_split.test_edges,
                 negative_ratio=float(cfg.eval.negative_ratio),
                 seed=int(derive_seed(cfg.seed, "eval")),
             )
             row = self._to_row(
-                metrics, task="link_prediction", system=system,
-                graph=train_graph, report=report, n_nodes=n_nodes, homophily=homophily,
-                seed=int(cfg.seed), routed_fraction=float(best["routed_fraction"]),
-                mode=str(best["mode"]), budget_ratio=float(best["budget_ratio"]),
+                metrics,
+                task="link_prediction",
+                system=system,
+                graph=train_graph,
+                report=report,
+                n_nodes=n_nodes,
+                homophily=homophily,
+                seed=int(cfg.seed),
+                routed_fraction=float(best["routed_fraction"]),
+                mode=str(best["mode"]),
+                budget_ratio=float(best["budget_ratio"]),
                 alpha_base=float(best["alpha_base"]),
-                backend_a=str(out_a.backend), backend_b=str(gnn.backend_id),
-                elapsed=0.0, peak=float(peak),
+                backend_a=str(out_a.backend),
+                backend_b=str(gnn.backend_id),
+                elapsed=0.0,
+                peak=float(peak),
                 warning_codes=self._warnings_for(system, out_a, gnn, [], decision),
                 hpo_selected_by=str(best["name"]),
             )
             rows.append(row)
-        rows.append({
-            "task": "link_prediction", "kind": "meta",
-            "dataset_id": dataset_id, "n_nodes": int(n_nodes),
-            "homophily_bucket": float(homophily),
-            "homophily_measured": float(report.edge_homophily),
-            "alpha_base": float(best["alpha_base"]),
-            "routed_fraction": float(best["routed_fraction"]),
-            "mode": str(best["mode"]),
-            "selected_config": str(best["name"]),
-            "val_auc": float(best["val_auc"]),
-            "elapsed_total_sec": float(time.perf_counter() - started),
-            "peak_rss_mb": float(peak),
-            "seed": int(cfg.seed),
-            "config_hash": config_hash(cfg),
-            "num_test_edges": int(edge_split.test_edges.shape[0]),
-        })
+        rows.append(
+            {
+                "task": "link_prediction",
+                "kind": "meta",
+                "dataset_id": dataset_id,
+                "n_nodes": int(n_nodes),
+                "homophily_bucket": float(homophily),
+                "homophily_measured": float(report.edge_homophily),
+                "alpha_base": float(best["alpha_base"]),
+                "routed_fraction": float(best["routed_fraction"]),
+                "mode": str(best["mode"]),
+                "selected_config": str(best["name"]),
+                "val_auc": float(best["val_auc"]),
+                "elapsed_total_sec": float(time.perf_counter() - started),
+                "peak_rss_mb": float(peak),
+                "seed": int(cfg.seed),
+                "config_hash": config_hash(cfg),
+                "num_test_edges": int(edge_split.test_edges.shape[0]),
+            }
+        )
         return rows
 
     # ------------------------------------------------------------------ shared
-    def run_bucket(self, n_nodes: int, homophily: float, task: str) -> list[dict[str, Any]]:
+    def run_bucket(
+        self, n_nodes: int, homophily: float, task: str
+    ) -> list[dict[str, Any]]:
         """按任务分发单桶执行。"""
         if task == "node_classification":
             return self.run_node_classification(n_nodes, homophily)
@@ -340,7 +412,9 @@ class HeteroForgePipeline:
         if system in ("haar", "channel_a"):
             codes.extend(str(w) for w in out_a.warnings)
         if system in ("haar", "channel_b"):
-            codes.extend(str(w) for w in getattr(gnn, "warnings", []) if hasattr(gnn, "warnings"))
+            codes.extend(
+                str(w) for w in getattr(gnn, "warnings", []) if hasattr(gnn, "warnings")
+            )
         if system == "haar":
             codes.extend(str(w) for w in hpo_warnings)
             codes.extend(str(w) for w in decision.warnings)

@@ -11,6 +11,7 @@ Example:
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +29,7 @@ def render_table(rows: list[dict[str, Any]], columns: list[str]) -> str:
         for c in columns:
             value = row.get(c)
             if isinstance(value, float):
-                text = f"{value:.4f}" if value == value else "nan"
+                text = f"{value:.4f}" if not math.isnan(value) else "nan"
             elif value is None:
                 text = "null"
             else:
@@ -40,7 +41,9 @@ def render_table(rows: list[dict[str, Any]], columns: list[str]) -> str:
     sep = "-+-".join("-" * widths[c] for c in columns)
     lines = [header, sep]
     for cells in rendered:
-        lines.append(" | ".join(cell.ljust(widths[c]) for cell, c in zip(cells, columns)))
+        lines.append(
+            " | ".join(cell.ljust(widths[c]) for cell, c in zip(cells, columns))
+        )
     return "\n".join(lines)
 
 

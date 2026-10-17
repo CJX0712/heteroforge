@@ -41,8 +41,14 @@ def scan(paths: list[Path] | None = None) -> list[tuple[str, int, int, str]]:
     """扫描目标文件, 返回违规列表。"""
     if paths is None:
         targets: list[Path] = []
-        for pattern in ("heteroforge/**/*.py", "tests/**/*.py", "examples/*.py",
-                        "scripts/*.py", "*.md", "docs/*.md"):
+        for pattern in (
+            "heteroforge/**/*.py",
+            "tests/**/*.py",
+            "examples/*.py",
+            "scripts/*.py",
+            "*.md",
+            "docs/*.md",
+        ):
             targets.extend(p for p in REPO_ROOT.glob(pattern) if p.is_file())
     else:
         targets = paths

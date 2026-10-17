@@ -23,9 +23,9 @@ from heteroforge.graph.homophily import (
 )
 
 __all__ = [
-    "measure_homophily",
-    "node_local_homophily",
     "build_features",
     "build_structural_features",
+    "measure_homophily",
+    "node_local_homophily",
     "signal_strength",
 ]

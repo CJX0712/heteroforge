@@ -23,9 +23,10 @@ import platform
 import tempfile
 import threading
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import numpy as np
 
@@ -58,7 +59,7 @@ def derive_seed(master_seed: int, tag: str) -> int:
     Returns:
         [0, 2**31-2] 内的整数。
     """
-    payload = f"{int(master_seed)}:{tag}".encode("utf-8")
+    payload = f"{int(master_seed)}:{tag}".encode()
     digest = hashlib.sha256(payload).digest()[:8]
     return int.from_bytes(digest, "big") % _SEED_MODULUS
 
@@ -98,7 +99,7 @@ def round_floats(obj: Any, ndigits: int = 6) -> Any:
         return {k: round_floats(v, ndigits) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [round_floats(v, ndigits) for v in obj]
-    if isinstance(obj, bool) or isinstance(obj, np.bool_):
+    if isinstance(obj, (bool, np.bool_)):
         return bool(obj)
     if isinstance(obj, (int, np.integer)):
         return int(obj)
@@ -124,16 +125,26 @@ def atomic_write_json(path: Path | str, payload: Any, indent: int = 2) -> Path:
     """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix="_tmp_", suffix=".json", dir=str(target.parent))
+    fd, tmp_name = tempfile.mkstemp(
+        prefix="_tmp_", suffix=".json", dir=str(target.parent)
+    )
     tmp_path = Path(tmp_name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=indent, default=_json_default)
+            json.dump(
+                payload,
+                handle,
+                ensure_ascii=False,
+                indent=indent,
+                default=_json_default,
+            )
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(str(tmp_path), str(target))
     except OSError as exc:
-        raise HeteroForgeError("E606", "artifact write failed", {"path": str(target)}) from exc
+        raise HeteroForgeError(
+            "E606", "artifact write failed", {"path": str(target)}
+        ) from exc
     finally:
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)
@@ -146,7 +157,7 @@ def rss_mb() -> float:
         if platform.system() == "Windows":
             return _rss_mb_windows()
         return _rss_mb_posix()
-    except Exception:
+    except Exception:  # noqa: BLE001 - 探针失败不得影响主流程，按契约退化为 nan
         return float("nan")
 
 
@@ -216,7 +227,10 @@ def start_peak_sampling(interval_sec: float = 0.1) -> threading.Thread:
         _PEAK_STATE["stop"] = threading.Event()
         _PEAK_STATE["peak"] = rss_mb()
         thread = threading.Thread(
-            target=_sample_loop, args=(interval_sec,), name="rss-peak-sampler", daemon=True
+            target=_sample_loop,
+            args=(interval_sec,),
+            name="rss-peak-sampler",
+            daemon=True,
         )
         _PEAK_STATE["thread"] = thread
         thread.start()
@@ -255,7 +269,11 @@ def timer() -> Iterator[dict[str, float]]:
     Yields:
         可变字典, 键 start / elapsed_sec / peak_rss_mb。
     """
-    record: dict[str, float] = {"start": time.perf_counter(), "elapsed_sec": 0.0, "peak_rss_mb": 0.0}
+    record: dict[str, float] = {
+        "start": time.perf_counter(),
+        "elapsed_sec": 0.0,
+        "peak_rss_mb": 0.0,
+    }
     try:
         yield record
     finally:
@@ -263,7 +281,9 @@ def timer() -> Iterator[dict[str, float]]:
         record["peak_rss_mb"] = peak_rss_mb()
 
 
-def estimate_bytes(n_nodes: int, n_edges: int, dim: int, num_classes: int, dense_path: bool = False) -> float:
+def estimate_bytes(
+    n_nodes: int, n_edges: int, dim: int, num_classes: int, dense_path: bool = False
+) -> float:
     """按架构 12.2 的公式估算内存字节数, 用于 E303 守卫。"""
     base = 8.0 * (2 * int(n_edges) + int(n_nodes))
     base += 8.0 * (int(n_nodes) * int(dim) * 2)
@@ -280,5 +300,7 @@ def safe_under_root(path: Path | str, root: Path | str) -> Path:
     if ".." in Path(path).parts:
         raise HeteroForgeError("E106", "path traversal rejected", {"path": str(path)})
     if base not in target.parents and target != base:
-        raise HeteroForgeError("E106", "path outside output root", {"path": str(path), "root": str(base)})
+        raise HeteroForgeError(
+            "E106", "path outside output root", {"path": str(path), "root": str(base)}
+        )
     return target

@@ -33,7 +33,9 @@ ADJACENCY_FILE = "adjacency.npz"
 META_FILE = "graph.meta.json"
 
 
-def save_graph_data(graph: GraphData, output_dir: Path | str, root: Path | str | None = None) -> Path:
+def save_graph_data(
+    graph: GraphData, output_dir: Path | str, root: Path | str | None = None
+) -> Path:
     """落盘图数据; 先写数据再写 meta, meta 写完才视为完整。
 
     Args:
@@ -64,7 +66,9 @@ def save_graph_data(graph: GraphData, output_dir: Path | str, root: Path | str |
         )
         (target / "_tmp_arrays.npz").replace(target / "arrays.npz")
     except OSError as exc:
-        raise HeteroForgeError("E606", "artifact write failed", {"path": str(target)}) from exc
+        raise HeteroForgeError(
+            "E606", "artifact write failed", {"path": str(target)}
+        ) from exc
     payload = {
         "schema": SCHEMA_NAME,
         "schema_version": SCHEMA_VERSION,
@@ -98,14 +102,21 @@ def load_graph_data(input_dir: Path | str, root: Path | str | None = None) -> Gr
     try:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise HeteroForgeError("E104", "graph meta unreadable", {"path": str(meta_path)}) from exc
-    if meta.get("schema") != SCHEMA_NAME or meta.get("schema_version") != SCHEMA_VERSION:
+        raise HeteroForgeError(
+            "E104", "graph meta unreadable", {"path": str(meta_path)}
+        ) from exc
+    if (
+        meta.get("schema") != SCHEMA_NAME
+        or meta.get("schema_version") != SCHEMA_VERSION
+    ):
         raise HeteroForgeError("E104", "graph schema mismatch", {"meta": meta})
     try:
         adjacency = sp.load_npz(str(source / ADJACENCY_FILE)).tocsr()
         arrays = np.load(str(source / "arrays.npz"))
     except (OSError, ValueError, KeyError) as exc:
-        raise HeteroForgeError("E104", "graph arrays unreadable", {"path": str(source)}) from exc
+        raise HeteroForgeError(
+            "E104", "graph arrays unreadable", {"path": str(source)}
+        ) from exc
     if not sp.isspmatrix_csr(adjacency):
         raise HeteroForgeError("E207", "stored adjacency is not CSR")
     graph = GraphData(

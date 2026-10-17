@@ -33,7 +33,7 @@ from scipy.sparse.linalg import eigsh
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler, normalize
 from sknetwork.embedding import SVD
-from sknetwork.linalg import Laplacian, LanczosEig, LanczosSVD
+from sknetwork.linalg import LanczosEig, LanczosSVD, Laplacian
 
 from heteroforge.core.config import EmbedConfig
 from heteroforge.core.errors import FALLBACK_COMPARABILITY_NOTE, HeteroForgeError
@@ -77,11 +77,15 @@ def _start_vector(size: int, seed: int) -> np.ndarray:
 class _SeededLanczosSVD(LanczosSVD):
     """为 sknetwork SVD 注入确定性起始向量的 solver。"""
 
-    def __init__(self, seed: int = 0, n_iter: int | None = None, tol: float = 0.0) -> None:
+    def __init__(
+        self, seed: int = 0, n_iter: int | None = None, tol: float = 0.0
+    ) -> None:
         super().__init__(n_iter=n_iter, tol=tol)
         self._seed = int(seed)
 
-    def fit(self, matrix: Any, n_components: int, init_vector: np.ndarray | None = None) -> Any:
+    def fit(
+        self, matrix: Any, n_components: int, init_vector: np.ndarray | None = None
+    ) -> Any:
         if init_vector is None:
             init_vector = _start_vector(min(matrix.shape), self._seed)
         return super().fit(matrix, n_components, init_vector=init_vector)
@@ -90,16 +94,25 @@ class _SeededLanczosSVD(LanczosSVD):
 class _SeededLanczosEig(LanczosEig):
     """为谱分解注入确定性起始向量的 solver。"""
 
-    def __init__(self, which: str = "SM", seed: int = 0, n_iter: int | None = None,
-                 tol: float = 0.0) -> None:
+    def __init__(
+        self,
+        which: str = "SM",
+        seed: int = 0,
+        n_iter: int | None = None,
+        tol: float = 0.0,
+    ) -> None:
         super().__init__(which=which, n_iter=n_iter, tol=tol)
         self._seed = int(seed)
 
     def fit(self, matrix: Any, n_components: int = 2) -> Any:
         v0 = _start_vector(matrix.shape[0], self._seed)
         self.eigenvalues_, self.eigenvectors_ = eigsh(
-            matrix.astype(float), int(n_components), which=self.which,
-            maxiter=self.n_iter, tol=self.tol, v0=v0,
+            matrix.astype(float),
+            int(n_components),
+            which=self.which,
+            maxiter=self.n_iter,
+            tol=self.tol,
+            v0=v0,
         )
         return self
 
@@ -127,10 +140,14 @@ def _embed_svd(adjacency: sp.csr_matrix, dim: int, seed: int) -> np.ndarray:
     n = adjacency.shape[0]
     k = max(1, min(int(dim), n - 1))
     model = SVD(n_components=k, solver=_SeededLanczosSVD(seed=seed))
-    return np.ascontiguousarray(np.asarray(model.fit_transform(adjacency), dtype=np.float64))
+    return np.ascontiguousarray(
+        np.asarray(model.fit_transform(adjacency), dtype=np.float64)
+    )
 
 
-def _embed_node2vec(adjacency: sp.csr_matrix, config: EmbedConfig, seed: int) -> np.ndarray:
+def _embed_node2vec(
+    adjacency: sp.csr_matrix, config: EmbedConfig, seed: int
+) -> np.ndarray:
     """node2vec 游走(Grover 原实现) + gensim Word2Vec SGNS; workers=1 且固定 seed。
 
     注: 不调用 node2vec.Node2Vec.fit(), 因为 node2vec 0.3.2 向 gensim 传已移除的
@@ -178,8 +195,13 @@ def _embed_node2vec(adjacency: sp.csr_matrix, config: EmbedConfig, seed: int) ->
     return np.ascontiguousarray(embedding)
 
 
-def _fit_head(embedding: np.ndarray, labels: np.ndarray, train_mask: np.ndarray,
-              seed: int, max_iter: int) -> np.ndarray | None:
+def _fit_head(
+    embedding: np.ndarray,
+    labels: np.ndarray,
+    train_mask: np.ndarray,
+    seed: int,
+    max_iter: int,
+) -> np.ndarray | None:
     """只用 train 标签拟合 LogisticRegression 头, 返回全图 proba。"""
     train = np.asarray(train_mask, dtype=bool)
     y = np.asarray(labels, dtype=np.int64)[train]
@@ -201,10 +223,18 @@ def _fit_head(embedding: np.ndarray, labels: np.ndarray, train_mask: np.ndarray,
 class ChannelAEmbedder:
     """通道 A 嵌入器: 单次探测 + ladder 降级 + 置信度头。"""
 
-    def __init__(self, preferred: str = "node2vec", dim: int = 64, seed: int = 0,
-                 rss_budget_mb: float = 8192.0, timeout_sec: float = 600.0) -> None:
+    def __init__(
+        self,
+        preferred: str = "node2vec",
+        dim: int = 64,
+        seed: int = 0,
+        rss_budget_mb: float = 8192.0,
+        timeout_sec: float = 600.0,
+    ) -> None:
         if preferred not in LADDER:
-            raise HeteroForgeError("E102", "unknown channel A backend", {"value": preferred})
+            raise HeteroForgeError(
+                "E102", "unknown channel A backend", {"value": preferred}
+            )
         self.preferred = preferred
         self.dim = int(dim)
         self.seed = int(seed)
@@ -231,7 +261,9 @@ class ChannelAEmbedder:
             return _embed_spectral_rw(adjacency, config.dim, config.seed or self.seed)
         return _embed_svd(adjacency, config.dim, config.seed or self.seed)
 
-    def fit_predict(self, graph: Any, config: EmbedConfig | None = None) -> ChannelOutput:
+    def fit_predict(
+        self, graph: Any, config: EmbedConfig | None = None
+    ) -> ChannelOutput:
         """计算全图嵌入与置信度; 任何失败都按 ladder 降级, 不抛业务异常。
 
         Args:
@@ -244,16 +276,19 @@ class ChannelAEmbedder:
         Raises:
             HeteroForgeError: E306, ladder 全部失败。
         """
-        cfg = config if config is not None else EmbedConfig(
-            backend=self.preferred, dim=self.dim, seed=self.seed
+        cfg = (
+            config
+            if config is not None
+            else EmbedConfig(backend=self.preferred, dim=self.dim, seed=self.seed)
         )
         graph.validate()
         n = int(graph.num_nodes)
         warnings: list[str] = []
         start_peak_sampling()
         started = time.perf_counter()
-        est_mb = estimate_bytes(n, int(graph.adjacency.nnz / 2), cfg.dim,
-                                max(2, graph.num_classes())) / (1024.0 * 1024.0)
+        est_mb = estimate_bytes(
+            n, int(graph.adjacency.nnz / 2), cfg.dim, max(2, graph.num_classes())
+        ) / (1024.0 * 1024.0)
         order = list(LADDER)
         start_at = order.index(self.preferred)
         if est_mb > self.rss_budget_mb and self.preferred == "node2vec":
@@ -269,7 +304,9 @@ class ChannelAEmbedder:
             try:
                 embedding = self._run_backend(backend, graph, cfg)
                 if embedding.shape[0] != n or not np.isfinite(embedding).all():
-                    raise HeteroForgeError("E304", "embedding shape or finiteness invalid")
+                    raise HeteroForgeError(
+                        "E304", "embedding shape or finiteness invalid"
+                    )
                 if time.perf_counter() - started > self.timeout_sec:
                     warnings.append("EMBED_TIMEOUT_FALLBACK")
                     continue
@@ -279,12 +316,20 @@ class ChannelAEmbedder:
                 code = getattr(exc, "errcode", None)
                 warnings.append(code if code else "OPTIONAL_BACKEND_UNAVAILABLE")
         if chosen is None:
-            raise HeteroForgeError("E306", "all channel A backends failed",
-                                   {"warnings": warnings, "num_nodes": n})
+            raise HeteroForgeError(
+                "E306",
+                "all channel A backends failed",
+                {"warnings": warnings, "num_nodes": n},
+            )
         backend, embedding = chosen
         fallback_used = backend != self.preferred
-        proba = _fit_head(embedding, graph.labels, graph.train_mask,
-                          cfg.seed or self.seed, cfg.head_max_iter)
+        proba = _fit_head(
+            embedding,
+            graph.labels,
+            graph.train_mask,
+            cfg.seed or self.seed,
+            cfg.head_max_iter,
+        )
         num_classes = max(2, graph.num_classes())
         if proba is not None:
             confidence = np.ascontiguousarray(proba.max(axis=1).astype(np.float64))
@@ -309,7 +354,14 @@ class ChannelAEmbedder:
             seed=int(cfg.seed or self.seed),
             elapsed_sec=float(elapsed),
             peak_rss_mb=float(peak_rss_mb()),
-            params={"dim": cfg.dim, "walk_length": cfg.walk_length, "num_walks": cfg.num_walks,
-                    "window": cfg.window, "p": cfg.p, "q": cfg.q, "workers": cfg.workers},
+            params={
+                "dim": cfg.dim,
+                "walk_length": cfg.walk_length,
+                "num_walks": cfg.num_walks,
+                "window": cfg.window,
+                "p": cfg.p,
+                "q": cfg.q,
+                "workers": cfg.workers,
+            },
             warnings=sorted(set(warnings)),
         )

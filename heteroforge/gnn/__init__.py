@@ -14,4 +14,4 @@ from __future__ import annotations
 from heteroforge.gnn.channel_b import PropLRBackend, SGCBackend
 from heteroforge.gnn.subgraph import k_hop_subgraph, symmetric_normalize
 
-__all__ = ["SGCBackend", "PropLRBackend", "k_hop_subgraph", "symmetric_normalize"]
+__all__ = ["PropLRBackend", "SGCBackend", "k_hop_subgraph", "symmetric_normalize"]

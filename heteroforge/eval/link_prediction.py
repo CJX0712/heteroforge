@@ -10,8 +10,6 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
 import scipy.sparse as sp
 
@@ -34,10 +32,12 @@ def roc_auc_manual(y_true: np.ndarray, y_score: np.ndarray) -> float:
         j = i
         while j + 1 < sorted_scores.size and sorted_scores[j + 1] == sorted_scores[i]:
             j += 1
-        ranks[order[i:j + 1]] = (i + j) / 2.0 + 1.0
+        ranks[order[i : j + 1]] = (i + j) / 2.0 + 1.0
         i = j + 1
-    return float((ranks[y_true == 1].sum() - pos.size * (pos.size + 1) / 2.0)
-                 / (pos.size * neg.size))
+    return float(
+        (ranks[y_true == 1].sum() - pos.size * (pos.size + 1) / 2.0)
+        / (pos.size * neg.size)
+    )
 
 
 def degree_aware_negatives(
@@ -63,11 +63,11 @@ def degree_aware_negatives(
     rng = np.random.default_rng(int(seed))
     n = adjacency.shape[0]
     degrees = np.asarray(adjacency.getnnz(axis=1), dtype=np.int64)
-    n_neg = max(1, int(round(float(negative_ratio))))
+    n_neg = max(1, round(float(negative_ratio)))
     out: list[tuple[int, int]] = []
     for u in np.asarray(sources, dtype=np.int64):
         u = int(u)
-        neighbors = adjacency.indices[adjacency.indptr[u]:adjacency.indptr[u + 1]]
+        neighbors = adjacency.indices[adjacency.indptr[u] : adjacency.indptr[u + 1]]
         blocked = np.zeros(n, dtype=bool)
         blocked[u] = True
         blocked[neighbors] = True
@@ -123,10 +123,12 @@ def evaluate_link_prediction(
     neg_edges = degree_aware_negatives(
         train_adjacency, test_edges[:, 0], negative_ratio=negative_ratio, seed=int(seed)
     )
-    y_true = np.concatenate([
-        np.ones(test_edges.shape[0], dtype=np.int64),
-        np.zeros(neg_edges.shape[0], dtype=np.int64),
-    ])
+    y_true = np.concatenate(
+        [
+            np.ones(test_edges.shape[0], dtype=np.int64),
+            np.zeros(neg_edges.shape[0], dtype=np.int64),
+        ]
+    )
     y_score = np.concatenate([_score(test_edges), _score(neg_edges)])
     auc = roc_auc_manual(y_true, y_score)
     from sklearn.metrics import average_precision_score as _sk_ap

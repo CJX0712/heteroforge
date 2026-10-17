@@ -8,8 +8,16 @@ import pytest
 from heteroforge.core.config import GNNConfig
 from heteroforge.core.errors import HeteroForgeError
 from heteroforge.embed.channel_a import ChannelAEmbedder
-from heteroforge.eval.link_prediction import degree_aware_negatives, evaluate_link_prediction, roc_auc_manual
-from heteroforge.eval.node_classification import evaluate_representation, head_predictions, macro_f1_manual
+from heteroforge.eval.link_prediction import (
+    degree_aware_negatives,
+    evaluate_link_prediction,
+    roc_auc_manual,
+)
+from heteroforge.eval.node_classification import (
+    evaluate_representation,
+    head_predictions,
+    macro_f1_manual,
+)
 from heteroforge.gnn.channel_b import SGCBackend
 from heteroforge.graph.homophily import measure_homophily
 from heteroforge.hpo.tuner import tune_routing
@@ -22,8 +30,13 @@ class TestMetrics:
 
         y_true = rng.integers(0, 4, 200)
         y_pred = rng.integers(0, 4, 200)
-        assert abs(macro_f1_manual(y_true, y_pred)
-                   - f1_score(y_true, y_pred, average="macro", zero_division=0)) < 1e-12
+        assert (
+            abs(
+                macro_f1_manual(y_true, y_pred)
+                - f1_score(y_true, y_pred, average="macro", zero_division=0)
+            )
+            < 1e-12
+        )
 
     def test_roc_auc_manual_matches_sklearn(self, rng):
         from sklearn.metrics import roc_auc_score
@@ -46,39 +59,52 @@ class TestMetrics:
             assert (lo, hi) not in edge_set
 
     def test_link_prediction_metrics(self, small_graph):
-        from heteroforge.data.split import EdgeSplit
-
         import scipy.sparse as sp
 
+        from heteroforge.data.split import EdgeSplit
+
         edges = np.array(
-            [(int(a), int(b)) for a, b in zip(*sp.triu(small_graph.adjacency, k=1).nonzero())],
+            [
+                (int(a), int(b))
+                for a, b in zip(*sp.triu(small_graph.adjacency, k=1).nonzero())
+            ],
             dtype=np.int64,
         )
         split = EdgeSplit(
             train_edges=edges[: len(edges) * 3 // 4],
-            val_edges=edges[len(edges) * 3 // 4:],
-            test_edges=edges[len(edges) * 3 // 4:],
+            val_edges=edges[len(edges) * 3 // 4 :],
+            test_edges=edges[len(edges) * 3 // 4 :],
             protected_edges=edges[:1],
             num_edges_total=len(edges),
         )
         train_adj = sp.csr_matrix(small_graph.adjacency.copy())
         mask = np.ones(train_adj.nnz, dtype=bool)
         train_adj.data = train_adj.data * mask
-        holdout = {(min(int(a), int(b)), max(int(a), int(b)))
-                   for a, b in split.test_edges}
+        holdout = {
+            (min(int(a), int(b)), max(int(a), int(b))) for a, b in split.test_edges
+        }
         coo = train_adj.tocoo()
         keep = [
-            k for k, (u, v) in enumerate(zip(coo.row, coo.col))
+            k
+            for k, (u, v) in enumerate(zip(coo.row, coo.col))
             if (min(int(u), int(v)), max(int(u), int(v))) not in holdout
         ]
         train_adj = train_adj.tocsr()[keep][:, keep] if False else train_adj
         from heteroforge.data.split import train_adjacency_from_split as _t
 
-        train_adj = _t(small_graph.adjacency,
-                       type(split)(train_edges=split.train_edges, val_edges=split.val_edges,
-                                   test_edges=split.test_edges, protected_edges=split.protected_edges))
+        train_adj = _t(
+            small_graph.adjacency,
+            type(split)(
+                train_edges=split.train_edges,
+                val_edges=split.val_edges,
+                test_edges=split.test_edges,
+                protected_edges=split.protected_edges,
+            ),
+        )
         rep = np.random.default_rng(3).random((small_graph.num_nodes, 8))
-        metrics = evaluate_link_prediction(rep, train_adj, split.test_edges, 1.0, seed=3)
+        metrics = evaluate_link_prediction(
+            rep, train_adj, split.test_edges, 1.0, seed=3
+        )
         assert 0.0 <= metrics["roc_auc"] <= 1.0
         assert 0.0 <= metrics["average_precision"] <= 1.0
 
@@ -86,14 +112,21 @@ class TestMetrics:
 class TestNodeClassification:
     def test_head_predictions_shapes(self, tiny_graph):
         rep = np.random.default_rng(1).random((tiny_graph.num_nodes, 6))
-        y_true, y_pred = head_predictions(rep, tiny_graph, tiny_graph.train_mask, tiny_graph.test_mask)
+        y_true, y_pred = head_predictions(
+            rep, tiny_graph, tiny_graph.train_mask, tiny_graph.test_mask
+        )
         assert y_true.shape == y_pred.shape and y_true.size > 0
 
     def test_evaluate_representation_touches_test_once(self, tiny_graph):
         rep = np.random.default_rng(1).random((tiny_graph.num_nodes, 6))
         result = evaluate_representation(
-            rep, tiny_graph, system="feat_only", dataset_id="t", homophily_bucket=0.5,
-            homophily_measured=0.5, seed=1,
+            rep,
+            tiny_graph,
+            system="feat_only",
+            dataset_id="t",
+            homophily_bucket=0.5,
+            homophily_measured=0.5,
+            seed=1,
         )
         assert result.test_touch_count == 1
         assert 0.0 <= result.metrics["macro_f1"] <= 1.0
@@ -101,12 +134,18 @@ class TestNodeClassification:
 
 class TestHPO:
     def test_hpo_beats_or_matches_best_endpoint(self, tiny_graph):
-        out_a = ChannelAEmbedder(preferred="spectral_rw", dim=16, seed=4).fit_predict(tiny_graph)
+        out_a = ChannelAEmbedder(preferred="spectral_rw", dim=16, seed=4).fit_predict(
+            tiny_graph
+        )
         gnn = SGCBackend(seed=4).fit(
-            tiny_graph, GNNConfig(seed=4, n_epochs=10), labels_mask=tiny_graph.train_mask
+            tiny_graph,
+            GNNConfig(seed=4, n_epochs=10),
+            labels_mask=tiny_graph.train_mask,
         )
         report = measure_homophily(tiny_graph.adjacency, tiny_graph.labels)
-        result = tune_routing(tiny_graph, report, out_a, gnn, seed=4, n_trials=6, timeout_sec=60)
+        result = tune_routing(
+            tiny_graph, report, out_a, gnn, seed=4, n_trials=6, timeout_sec=60
+        )
         assert result.selected_by in ("hpo", "default")
         assert result.params.alpha_base >= 0.0 and result.params.alpha_base <= 1.0
 
@@ -116,7 +155,9 @@ class TestHPO:
             tiny_graph, GNNConfig(seed=4, n_epochs=3), labels_mask=tiny_graph.train_mask
         )
         report = measure_homophily(tiny_graph.adjacency, tiny_graph.labels)
-        result = tune_routing(tiny_graph, report, out_a, gnn, seed=4, n_trials=5, timeout_sec=0.0)
+        result = tune_routing(
+            tiny_graph, report, out_a, gnn, seed=4, n_trials=5, timeout_sec=0.0
+        )
         assert result.selected_by == "default"
         assert "HPO_FALLBACK" in result.warnings
 
@@ -124,10 +165,21 @@ class TestHPO:
 class TestGate:
     def _rows(self, haar, best):
         rows = []
-        for system, value in (("haar", haar), ("channel_a", best), ("channel_b", best - 0.1)):
+        for system, value in (
+            ("haar", haar),
+            ("channel_a", best),
+            ("channel_b", best - 0.1),
+        ):
             for h in (0.2, 0.8):
-                rows.append({"task": "node_classification", "system": system,
-                             "n_nodes": 800, "homophily_bucket": h, "macro_f1": value})
+                rows.append(
+                    {
+                        "task": "node_classification",
+                        "system": system,
+                        "n_nodes": 800,
+                        "homophily_bucket": h,
+                        "macro_f1": value,
+                    }
+                )
         return rows
 
     def test_gate_pass(self):

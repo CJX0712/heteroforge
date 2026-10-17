@@ -21,7 +21,9 @@ import scipy.sparse as sp
 from heteroforge.core.errors import HeteroForgeError
 
 
-def symmetric_normalize(adjacency: sp.csr_matrix, add_self_loop: bool = True) -> sp.csr_matrix:
+def symmetric_normalize(
+    adjacency: sp.csr_matrix, add_self_loop: bool = True
+) -> sp.csr_matrix:
     """对称归一化 D^{-1/2} A D^{-1/2}; 孤立节点保持零行。
 
     Args:
@@ -81,8 +83,11 @@ def k_hop_subgraph(
         if not frontier:
             break
     if len(visited) <= 1 and raise_on_empty:
-        raise HeteroForgeError("E404", "k-hop subgraph contains only the center",
-                               {"center": center, "k_hop": k_hop})
+        raise HeteroForgeError(
+            "E404",
+            "k-hop subgraph contains only the center",
+            {"center": center, "k_hop": k_hop},
+        )
     nodes = np.asarray(sorted(visited), dtype=np.int64)
     sub = sp.csr_matrix(adj[nodes][:, nodes])
     center_pos = int(np.flatnonzero(nodes == center)[0])
@@ -100,7 +105,9 @@ def batch_k_hop_subgraphs(
     results: list[tuple[int, np.ndarray, sp.csr_matrix, int]] = []
     for center in np.asarray(centers, dtype=np.int64):
         try:
-            nodes, sub, pos = k_hop_subgraph(adjacency, int(center), k_hop=k_hop, raise_on_empty=True)
+            nodes, sub, pos = k_hop_subgraph(
+                adjacency, int(center), k_hop=k_hop, raise_on_empty=True
+            )
         except HeteroForgeError:
             nodes = np.asarray([int(center)], dtype=np.int64)
             sub = sp.csr_matrix((1, 1), dtype=np.float64)

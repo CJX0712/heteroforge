@@ -308,16 +308,16 @@ h_adj = (h_edge - sum_c d_c^2) / (1 - sum_c d_c^2)
 ```python
 @dataclass
 class ChannelOutput:
-    channel: str                   # 'A' | 'B'
-    backend: str                   # 'node2vec' | 'spectral_rw' | 'svd' | 'sgc' | 'prop_lr'
-    backend_license: str           # 'MIT' | 'LGPL-2.1-only' | 'BSD-3-Clause'
-    fallback_used: bool            # 是否发生了降级事件
-    fallback_from: str | None      # 降级前的 backend id
-    embedding: np.ndarray          # (n, d) float64, NaN-free
-    node_ids: np.ndarray           # (n,) int64, 必须 == arange(n)
-    proba: np.ndarray | None       # (n, C) float64, 行和为 1
-    confidence: np.ndarray         # (n,) float64, [0,1], 越大越可信
-    computed_mask: np.ndarray      # (n,) bool, 哪些节点真的算了值
+    channel: str  # 'A' | 'B'
+    backend: str  # 'node2vec' | 'spectral_rw' | 'svd' | 'sgc' | 'prop_lr'
+    backend_license: str  # 'MIT' | 'LGPL-2.1-only' | 'BSD-3-Clause'
+    fallback_used: bool  # 是否发生了降级事件
+    fallback_from: str | None  # 降级前的 backend id
+    embedding: np.ndarray  # (n, d) float64, NaN-free
+    node_ids: np.ndarray  # (n,) int64, 必须 == arange(n)
+    proba: np.ndarray | None  # (n, C) float64, 行和为 1
+    confidence: np.ndarray  # (n,) float64, [0,1], 越大越可信
+    computed_mask: np.ndarray  # (n,) bool, 哪些节点真的算了值
     dim: int
     seed: int
     elapsed_sec: float
@@ -369,20 +369,20 @@ class RoutingDecision:
 ```python
 @dataclass
 class EvalResult:
-    task: str                      # 'node_classification' | 'link_prediction'
-    system: str                    # 'feature_lr'|'single_a'|'single_b'|'full_dual'|'cascade'
+    task: str  # 'node_classification' | 'link_prediction'
+    system: str  # 'feature_lr'|'single_a'|'single_b'|'full_dual'|'cascade'
     dataset_id: str
     homophily_bucket: float
     homophily_measured: float
     n_nodes: int
     n_samples: int
     seed: int
-    metrics: dict[str, float]      # 写盘保留 6 位 / 控制台保留 4 位
+    metrics: dict[str, float]  # 写盘保留 6 位 / 控制台保留 4 位
     elapsed_sec: float
     peak_rss_mb: float
     routed_fraction: float
-    is_primary: bool               # 一次实验只允许一个 True
-    test_touch_count: int          # 必须恰为 1，否则 E604
+    is_primary: bool  # 一次实验只允许一个 True
+    test_touch_count: int  # 必须恰为 1，否则 E604
     leakage_hash: str
 ```
 
@@ -398,15 +398,15 @@ class EvalResult:
 ```python
 @dataclass
 class BenchmarkRow:
-    generator: str                 # 'lfr' | 'sbm'（配置值）
-    generator_effective: str       # 实际使用的生成器，降级时为 'sbm'
+    generator: str  # 'lfr' | 'sbm'（配置值）
+    generator_effective: str  # 实际使用的生成器，降级时为 'sbm'
     n_nodes: int
     n_edges: int
     homophily_target: float
     homophily_measured: float
     num_classes: int
-    class_balance: str             # 'balanced' | 'imbalanced_1_1_1_1_4'
-    feature_signal: str            # 'strong' | 'weak'
+    class_balance: str  # 'balanced' | 'imbalanced_1_1_1_1_4'
+    feature_signal: str  # 'strong' | 'weak'
     task: str
     system: str
     seed: int
@@ -423,8 +423,8 @@ class BenchmarkRow:
     backend_b: str
     elapsed_sec: float
     peak_rss_mb: float
-    status: str                    # 'OK' | 'WARN' | 'FAIL'
-    warning_codes: str             # ';'-joined 或空串
+    status: str  # 'OK' | 'WARN' | 'FAIL'
+    warning_codes: str  # ';'-joined 或空串
     split_hash: str
     config_hash: str
 ```
@@ -441,7 +441,7 @@ class SplitSpec:
     edge_val_ratio: float = 0.15
     edge_test_ratio: float = 0.15
     stratify: bool = True
-    require_connected_train_graph: bool = True   # 链路预测硬要求（裁断 7）
+    require_connected_train_graph: bool = True  # 链路预测硬要求（裁断 7）
     version: str = "1.0"
 ```
 
@@ -506,11 +506,12 @@ class SplitSpec:
 ```python
 @runtime_checkable
 class Embedder(Protocol):
-    backend_id: str        # 类属性
-    license_id: str        # 类属性
+    backend_id: str  # 类属性
+    license_id: str  # 类属性
 
-    def fit_predict(self, graph: GraphData,
-                    config: EmbedConfig | None = None) -> ChannelOutput:
+    def fit_predict(
+        self, graph: GraphData, config: EmbedConfig | None = None
+    ) -> ChannelOutput:
         """全图一次性计算浅层结构嵌入与置信度。禁止使用 val/test 标签。"""
 ```
 
@@ -527,13 +528,14 @@ class Embedder(Protocol):
 class GNNBackend(Protocol):
     backend_id: str
 
-    def fit(self, graph: GraphData, config: GNNConfig,
-            labels_mask: np.ndarray) -> "Self":
+    def fit(
+        self, graph: GraphData, config: GNNConfig, labels_mask: np.ndarray
+    ) -> "Self":
         """在 full train graph 上训练全局权重。只允许 labels_mask 内的标签参与。"""
 
-    def predict(self, graph: GraphData,
-                nodes: np.ndarray | None = None,
-                k_hop: int = 2) -> ChannelOutput:
+    def predict(
+        self, graph: GraphData, nodes: np.ndarray | None = None, k_hop: int = 2
+    ) -> ChannelOutput:
         """nodes 为 None 表示全图前向；否则只对 nodes 做 k-hop induced subgraph 前向。
         未被计算的节点 computed_mask=False。"""
 
@@ -552,14 +554,18 @@ class GNNBackend(Protocol):
 ```python
 @runtime_checkable
 class Router(Protocol):
-    def route(self, graph: GraphData,
-              report: HomophilyReport,
-              out_a: ChannelOutput,
-              out_b: ChannelOutput | None = None,
-              params: RoutingParams | None = None) -> RoutingDecision: ...
+    def route(
+        self,
+        graph: GraphData,
+        report: HomophilyReport,
+        out_a: ChannelOutput,
+        out_b: ChannelOutput | None = None,
+        params: RoutingParams | None = None,
+    ) -> RoutingDecision: ...
 
-    def fuse(self, decision: RoutingDecision,
-             out_a: ChannelOutput, out_b: ChannelOutput) -> np.ndarray: ...
+    def fuse(
+        self, decision: RoutingDecision, out_a: ChannelOutput, out_b: ChannelOutput
+    ) -> np.ndarray: ...
 ```
 
 契约：
@@ -572,14 +578,15 @@ class Router(Protocol):
 ```python
 @runtime_checkable
 class Evaluator(Protocol):
-    task: str          # 'node_classification' | 'link_prediction'
+    task: str  # 'node_classification' | 'link_prediction'
 
-    def evaluate(self, graph: GraphData,
-                 output: ChannelOutput | np.ndarray,
-                 config: EvalConfig) -> EvalResult: ...
+    def evaluate(
+        self, graph: GraphData, output: ChannelOutput | np.ndarray, config: EvalConfig
+    ) -> EvalResult: ...
 
-    def cross_check_sklearn(self, y_true: np.ndarray,
-                            y_score: np.ndarray) -> dict[str, float]:
+    def cross_check_sklearn(
+        self, y_true: np.ndarray, y_score: np.ndarray
+    ) -> dict[str, float]:
         """与 sklearn.metrics 对照，差值 > 1e-12 抛 E605。"""
 ```
 
@@ -588,10 +595,12 @@ class Evaluator(Protocol):
 ```python
 @runtime_checkable
 class Generator(Protocol):
-    generator_id: str    # 'sbm' | 'lfr'
-    def generate(self, n_nodes: int, num_classes: int, homophily: float,
-                 seed: int, **kwargs) -> tuple[nx.Graph, np.ndarray]: ...
-    def max_retry(self) -> int: ...   # LFR 返回 3；失败由 synthetic 层降级到 SBM
+    generator_id: str  # 'sbm' | 'lfr'
+
+    def generate(
+        self, n_nodes: int, num_classes: int, homophily: float, seed: int, **kwargs
+    ) -> tuple[nx.Graph, np.ndarray]: ...
+    def max_retry(self) -> int: ...  # LFR 返回 3；失败由 synthetic 层降级到 SBM
 ```
 
 ### 6.6 已验证的实现配方（写死，不要自行猜测）
@@ -601,16 +610,21 @@ class Generator(Protocol):
 ```python
 from sknetwork.gnn import GNNClassifier, Convolution, CrossEntropy, ADAM
 
-layers = [Convolution('Conv', n_classes,
-                      activation='Identity',       # 不接受 None，必须是字符串
-                      use_bias=True,
-                      normalization='both',
-                      self_embeddings=True,
-                      loss=CrossEntropy())]        # 最后一层必须挂 loss，否则 ValueError
+layers = [
+    Convolution(
+        "Conv",
+        n_classes,
+        activation="Identity",  # 不接受 None，必须是字符串
+        use_bias=True,
+        normalization="both",
+        self_embeddings=True,
+        loss=CrossEntropy(),
+    )
+]  # 最后一层必须挂 loss，否则 ValueError
 gnn = GNNClassifier(layers=layers, optimizer=ADAM(lr), early_stopping=False)
 gnn.fit(adj_csr, features, labels, n_epochs=N, random_state=seed)
-proba_all = gnn.predict_proba()                    # (n, C)，行和为 1
-proba_node = gnn.forward(sub_adj_csr, sub_X)       # (m, C)，用于 k-hop 局部前向
+proba_all = gnn.predict_proba()  # (n, C)，行和为 1
+proba_node = gnn.forward(sub_adj_csr, sub_X)  # (m, C)，用于 k-hop 局部前向
 ```
 
 禁止的写法：`GNNClassifier(dims=[F, C])`（会展开成 2 层，不是 SGC）；`activations=None`（TypeError）。
@@ -992,9 +1006,10 @@ def rss_mb() -> float:
 TOLERANCE = 0.005
 BUCKETS = [0.05, 0.2, 0.5, 0.8, 0.95]
 
+
 def test_noninferiority_per_bucket():
     for bucket in BUCKETS:
-        row = run_bucket(bucket, n_nodes=800)      # n=800 以控制 CI 时长
+        row = run_bucket(bucket, n_nodes=800)  # n=800 以控制 CI 时长
         best_single = max(row.single_a.macro_f1, row.single_b.macro_f1)
         assert row.cascade.macro_f1 >= best_single - TOLERANCE, (
             f"E602 bucket={bucket} haar={row.cascade.macro_f1:.6f} "
@@ -1005,12 +1020,11 @@ def test_noninferiority_per_bucket():
             f"E602 link bucket={bucket} haar_auc={row.cascade.roc_auc:.6f}"
         )
 
+
 def test_mean_strictly_better():
     rows = [run_bucket(h, n_nodes=800) for h in BUCKETS]
     haar = statistics.fmean(r.cascade.macro_f1 for r in rows)
-    best = statistics.fmean(
-        max(r.single_a.macro_f1, r.single_b.macro_f1) for r in rows
-    )
+    best = statistics.fmean(max(r.single_a.macro_f1, r.single_b.macro_f1) for r in rows)
     assert haar > best, f"E603 mean_haar={haar:.6f} mean_best_single={best:.6f}"
 ```
 

@@ -25,7 +25,10 @@ from heteroforge.core.errors import HeteroForgeError
 SIGNAL_LEVELS: tuple[str, ...] = ("strong", "weak")
 
 # 类中心间距与噪声标准差的比值, strong 明显大于 weak。
-_SIGNAL_PARAMS: dict[str, tuple[float, float]] = {"strong": (2.5, 0.35), "weak": (0.45, 1.10)}
+_SIGNAL_PARAMS: dict[str, tuple[float, float]] = {
+    "strong": (2.5, 0.35),
+    "weak": (0.45, 1.10),
+}
 
 
 def build_features(
@@ -53,7 +56,9 @@ def build_features(
     n = labels.shape[0]
     separation, noise = _SIGNAL_PARAMS[signal]
     rng = np.random.default_rng(int(seed))
-    centers = rng.normal(loc=0.0, scale=1.0, size=(int(num_classes), int(dim))) * separation
+    centers = (
+        rng.normal(loc=0.0, scale=1.0, size=(int(num_classes), int(dim))) * separation
+    )
     safe = np.where(labels >= 0, labels, 0)
     if safe.max() >= int(num_classes):
         raise HeteroForgeError("E206", "label value exceeds num_classes")
@@ -91,7 +96,9 @@ def signal_strength(features: np.ndarray, labels: np.ndarray, seed: int = 0) -> 
     return float(model.score(scaler.transform(x_test), y_test))
 
 
-def build_structural_features(adjacency: sp.csr_matrix, include_clustering: bool = False) -> np.ndarray:
+def build_structural_features(
+    adjacency: sp.csr_matrix, include_clustering: bool = False
+) -> np.ndarray:
     """结构统计特征: 度数、对数度数、度占比。
 
     Args:
@@ -111,7 +118,9 @@ def build_structural_features(adjacency: sp.csr_matrix, include_clustering: bool
         import networkx as nx
 
         nx_graph = nx.from_scipy_sparse_array(adjacency)
-        clustering = np.asarray(list(nx.clustering(nx_graph).values()), dtype=np.float64).reshape(-1, 1)
+        clustering = np.asarray(
+            list(nx.clustering(nx_graph).values()), dtype=np.float64
+        ).reshape(-1, 1)
         columns.append(clustering)
     matrix = np.concatenate(columns, axis=1)
     matrix = np.ascontiguousarray(matrix.astype(np.float64))

@@ -117,7 +117,10 @@ def evaluate_representation(
     cfg = config if config is not None else EvalConfig()
     started = time.perf_counter()
     y_true, y_pred = head_predictions(
-        representation, graph, fit_mask=graph.train_mask, pred_mask=graph.test_mask,
+        representation,
+        graph,
+        fit_mask=graph.train_mask,
+        pred_mask=graph.test_mask,
         max_iter=int(cfg.max_iter),
     )
     head_elapsed = time.perf_counter() - started
@@ -130,7 +133,8 @@ def evaluate_representation(
     sk_macro = float(_sk_f1(y_true, y_pred, average="macro", zero_division=0))
     if abs(sk_macro - macro) > 1e-9:
         raise HeteroForgeError(
-            "E605", "manual macro-F1 mismatches sklearn",
+            "E605",
+            "manual macro-F1 mismatches sklearn",
             {"manual": macro, "sklearn": sk_macro},
         )
     _LAST_SKLEARN["macro_f1"] = sk_macro

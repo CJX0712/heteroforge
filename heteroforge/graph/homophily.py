@@ -30,7 +30,9 @@ def _as_graph(graph: nx.Graph | sp.csr_matrix) -> nx.Graph:
     return nx.from_scipy_sparse_array(sp.csr_matrix(graph))
 
 
-def node_local_homophily(adjacency: sp.csr_matrix, labels: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def node_local_homophily(
+    adjacency: sp.csr_matrix, labels: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """逐节点同配比例; 度为 0 的节点为 NaN。
 
     Args:
@@ -74,7 +76,9 @@ def measure_homophily(
     n = nx_graph.number_of_nodes()
     m = nx_graph.number_of_edges()
     adjacency = sp.csr_matrix(
-        nx.to_scipy_sparse_array(nx_graph, nodelist=sorted(nx_graph.nodes()), format="csr")
+        nx.to_scipy_sparse_array(
+            nx_graph, nodelist=sorted(nx_graph.nodes()), format="csr"
+        )
     )
     h_vec, degrees = node_local_homophily(adjacency, labels)
     isolated = int(np.count_nonzero(degrees == 0))
@@ -88,16 +92,27 @@ def measure_homophily(
     total_degree = float(degrees.sum())
     if total_degree > 0 and m > 0:
         shares = np.array(
-            [float(degrees[labels == c].sum()) / total_degree for c in np.unique(labels)],
+            [
+                float(degrees[labels == c].sum()) / total_degree
+                for c in np.unique(labels)
+            ],
             dtype=np.float64,
         )
         baseline = float(np.sum(shares**2))
-        h_adj = (edge_h - baseline) / (1.0 - baseline) if abs(1.0 - baseline) > 1e-12 else float("nan")
+        h_adj = (
+            (edge_h - baseline) / (1.0 - baseline)
+            if abs(1.0 - baseline) > 1e-12
+            else float("nan")
+        )
     else:
         h_adj = float("nan")
-    degree_assort = _safe_assortativity(lambda: nx.degree_assortativity_coefficient(nx_graph))
+    degree_assort = _safe_assortativity(
+        lambda: nx.degree_assortativity_coefficient(nx_graph)
+    )
     labelled = nx_graph.copy()
-    nx.set_node_attributes(labelled, {int(i): int(v) for i, v in enumerate(labels)}, "label")
+    nx.set_node_attributes(
+        labelled, {int(i): int(v) for i, v in enumerate(labels)}, "label"
+    )
     attr_assort = _safe_assortativity(
         lambda: nx.attribute_assortativity_coefficient(labelled, "label")
     )

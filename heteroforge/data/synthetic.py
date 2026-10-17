@@ -43,7 +43,9 @@ class SyntheticGraph:
 
     def to_csr(self) -> sp.csr_matrix:
         """转为 CSR 邻接(float64, 对称, 无自环)。"""
-        adj = nx.to_scipy_sparse_array(self.graph, nodelist=sorted(self.graph.nodes()), format="csr")
+        adj = nx.to_scipy_sparse_array(
+            self.graph, nodelist=sorted(self.graph.nodes()), format="csr"
+        )
         return sp.csr_matrix(adj.astype(np.float64))
 
 
@@ -56,7 +58,7 @@ def _class_sizes(n_nodes: int, num_classes: int, class_balance: str) -> list[int
     else:
         weights = [1.0] * num_classes
     total = float(sum(weights))
-    sizes = [max(1, int(round(n_nodes * w / total))) for w in weights]
+    sizes = [max(1, round(n_nodes * w / total)) for w in weights]
     diff = int(n_nodes) - int(sum(sizes))
     idx = 0
     while diff != 0:
@@ -109,14 +111,18 @@ def _build_sbm(sizes: list[int], p_in: float, p_out: float, seed: int) -> nx.Gra
     num_classes = len(sizes)
     probs = np.full((num_classes, num_classes), float(p_out), dtype=np.float64)
     np.fill_diagonal(probs, float(p_in))
-    graph = nx.stochastic_block_model(sizes, probs, seed=int(seed), directed=False, selfloops=False)
+    graph = nx.stochastic_block_model(
+        sizes, probs, seed=int(seed), directed=False, selfloops=False
+    )
     graph.remove_edges_from(nx.selfloop_edges(graph))
     return nx.convert_node_labels_to_integers(graph, first_label=0, ordering="sorted")
 
 
 def _attach_labels(graph: nx.Graph, labels: np.ndarray) -> nx.Graph:
     """把标签写入节点属性 label, 便于度量层与序列化。"""
-    nx.set_node_attributes(graph, {int(i): int(v) for i, v in enumerate(labels)}, "label")
+    nx.set_node_attributes(
+        graph, {int(i): int(v) for i, v in enumerate(labels)}, "label"
+    )
     return graph
 
 
@@ -132,7 +138,9 @@ def generate_sbm(
 ) -> SyntheticGraph:
     """校准式 SBM 生成: 生成 -> 实测 -> 二分校正 p_in/p_out, 最多 max_retry 次。"""
     sizes = _class_sizes(n_nodes, num_classes, class_balance)
-    labels = np.concatenate([np.full(s, c, dtype=np.int64) for c, s in enumerate(sizes)])
+    labels = np.concatenate(
+        [np.full(s, c, dtype=np.int64) for c, s in enumerate(sizes)]
+    )
     p_in, p_out, m_target = _initial_probabilities(sizes, homophily, avg_degree)
     best: SyntheticGraph | None = None
     for attempt in range(1, max(1, int(max_retry)) + 1):
@@ -152,14 +160,19 @@ def generate_sbm(
         if np.isfinite(measured) and abs(measured - homophily) <= tolerance:
             return result
         if best is None or (
-            np.isfinite(measured) and abs(measured - homophily) < abs(best.homophily_measured - homophily)
+            np.isfinite(measured)
+            and abs(measured - homophily) < abs(best.homophily_measured - homophily)
         ):
             best = result
         if not np.isfinite(measured):
             break
         # 校正: 同配边概率按 target/measured 缩放, 异配边按补空间缩放, 再回压到目标边数
         new_in = p_in * (homophily / measured) if measured > 1e-9 else p_in * 2.0
-        new_out = p_out * ((1.0 - homophily) / (1.0 - measured)) if measured < 1.0 - 1e-9 else p_out * 2.0
+        new_out = (
+            p_out * ((1.0 - homophily) / (1.0 - measured))
+            if measured < 1.0 - 1e-9
+            else p_out * 2.0
+        )
         within, across = _pair_counts(sizes)
         m_new = within * new_in + across * new_out
         if m_new > 1e-9:
@@ -176,7 +189,9 @@ def generate_sbm(
     return best
 
 
-def _lfr_attempt(n_nodes: int, mu: float, min_degree: int, max_degree: int, seed: int) -> nx.Graph:
+def _lfr_attempt(
+    n_nodes: int, mu: float, min_degree: int, max_degree: int, seed: int
+) -> nx.Graph:
     """单次 LFR 尝试; 失败由上层捕获。"""
     return nx.LFR_benchmark_graph(
         n=n_nodes,
@@ -192,7 +207,9 @@ def _lfr_attempt(n_nodes: int, mu: float, min_degree: int, max_degree: int, seed
     )
 
 
-def _communities_to_labels(graph: nx.Graph, n_nodes: int, num_classes: int) -> np.ndarray:
+def _communities_to_labels(
+    graph: nx.Graph, n_nodes: int, num_classes: int
+) -> np.ndarray:
     """LFR 社区映射为 C 个类: 最大 C-1 个社区各占一类, 其余并入最后一类。
 
     社区取自 LFR 自带的 community 节点属性(每个节点一个 frozenset), 不做二次社区发现。
@@ -203,8 +220,11 @@ def _communities_to_labels(graph: nx.Graph, n_nodes: int, num_classes: int) -> n
         buckets.setdefault(key, []).append(int(node))
     groups = sorted(buckets.values(), key=len, reverse=True)
     if len(groups) < num_classes:
-        raise HeteroForgeError("E201", "LFR community count below num_classes",
-                               {"communities": len(groups)})
+        raise HeteroForgeError(
+            "E201",
+            "LFR community count below num_classes",
+            {"communities": len(groups)},
+        )
     labels = np.full(n_nodes, num_classes - 1, dtype=np.int64)
     for cls in range(num_classes - 1):
         labels[np.asarray(groups[cls], dtype=np.int64)] = cls
@@ -228,7 +248,9 @@ def generate_lfr(
     for attempt in range(1, max(1, int(max_retry)) + 1):
         try:
             graph = _lfr_attempt(n_nodes, mu, min_degree, max_degree, seed + attempt)
-            graph = nx.convert_node_labels_to_integers(graph, first_label=0, ordering="sorted")
+            graph = nx.convert_node_labels_to_integers(
+                graph, first_label=0, ordering="sorted"
+            )
             if graph.number_of_nodes() != n_nodes:
                 raise HeteroForgeError("E201", "LFR node count mismatch")
             labels = _communities_to_labels(graph, n_nodes, num_classes)
@@ -283,12 +305,18 @@ def generate_graph(
     """统一生成入口; 先做规模守卫(E204), 再按 generator 分发。"""
     if limits is not None:
         if int(n_nodes) > int(limits.get("max_nodes", 5000)):
-            raise HeteroForgeError("E204", "n_nodes exceeds limit", {"n_nodes": n_nodes})
+            raise HeteroForgeError(
+                "E204", "n_nodes exceeds limit", {"n_nodes": n_nodes}
+            )
         est_edges = int(n_nodes * avg_degree / 2)
         if est_edges > int(limits.get("max_edges", 200000)):
-            raise HeteroForgeError("E204", "estimated edges exceed limit", {"edges": est_edges})
+            raise HeteroForgeError(
+                "E204", "estimated edges exceed limit", {"edges": est_edges}
+            )
     if not 0.0 <= float(homophily) <= 1.0:
-        raise HeteroForgeError("E102", "homophily must be in [0,1]", {"value": homophily})
+        raise HeteroForgeError(
+            "E102", "homophily must be in [0,1]", {"value": homophily}
+        )
     seed = int(derive_seed(seed, "data"))
     if generator == "lfr":
         return generate_lfr(

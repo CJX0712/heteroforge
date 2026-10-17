@@ -31,7 +31,10 @@ def _scan_banned_modules() -> list[str]:
     """
     hits: list[str] = []
     for name in list(sys.modules):
-        if any(name == prefix or name.startswith(prefix + ".") for prefix in BANNED_PREFIXES):
+        if any(
+            name == prefix or name.startswith(prefix + ".")
+            for prefix in BANNED_PREFIXES
+        ):
             hits.append(name)
     return hits
 
@@ -58,14 +61,16 @@ def assert_clean_runtime() -> None:
 
     hits = _scan_banned_modules()
     if hits:
-        raise HeteroForgeError("E105", "banned module already imported", {"modules": hits})
+        raise HeteroForgeError(
+            "E105", "banned module already imported", {"modules": hits}
+        )
 
 
 __all__ = [
-    "__version__",
+    "BANNED_PREFIXES",
     "__author__",
     "__license__",
-    "BANNED_PREFIXES",
-    "logger",
+    "__version__",
     "assert_clean_runtime",
+    "logger",
 ]

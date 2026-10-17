@@ -7,7 +7,12 @@ import pytest
 
 from heteroforge.core.errors import HeteroForgeError
 from heteroforge.core.types import SplitSpec
-from heteroforge.data.split import split_edges, split_hash, split_nodes, train_adjacency_from_split
+from heteroforge.data.split import (
+    split_edges,
+    split_hash,
+    split_nodes,
+    train_adjacency_from_split,
+)
 from heteroforge.data.synthetic import generate_graph, make_graph_data
 from heteroforge.graph.homophily import measure_homophily, node_local_homophily
 
@@ -15,7 +20,9 @@ from heteroforge.graph.homophily import measure_homophily, node_local_homophily
 class TestSynthetic:
     def test_sbm_homophily_buckets(self):
         for target in (0.05, 0.5, 0.95):
-            out = generate_graph(200, 5, target, seed=5, generator="sbm", tolerance=0.05)
+            out = generate_graph(
+                200, 5, target, seed=5, generator="sbm", tolerance=0.05
+            )
             assert abs(out.homophily_measured - target) <= 0.06
 
     def test_make_graph_data_contract(self):

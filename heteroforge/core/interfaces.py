@@ -22,7 +22,13 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 from heteroforge.core.config import EmbedConfig, EvalConfig, GNNConfig, RoutingParams
-from heteroforge.core.types import ChannelOutput, EvalResult, GraphData, HomophilyReport, RoutingDecision
+from heteroforge.core.types import (
+    ChannelOutput,
+    EvalResult,
+    GraphData,
+    HomophilyReport,
+    RoutingDecision,
+)
 
 
 @runtime_checkable
@@ -39,7 +45,9 @@ class Embedder(Protocol):
         """后端许可证 id。"""
         ...
 
-    def fit_predict(self, graph: GraphData, config: EmbedConfig | None = None) -> ChannelOutput:
+    def fit_predict(
+        self, graph: GraphData, config: EmbedConfig | None = None
+    ) -> ChannelOutput:
         """计算嵌入与置信度; 失败按 ladder 降级, 禁止抛业务异常。"""
         ...
 
@@ -53,7 +61,9 @@ class GNNBackend(Protocol):
         """后端算法 id: sgc 或 prop_lr。"""
         ...
 
-    def fit(self, graph: GraphData, config: GNNConfig, labels_mask: np.ndarray) -> "GNNBackend":
+    def fit(
+        self, graph: GraphData, config: GNNConfig, labels_mask: np.ndarray
+    ) -> GNNBackend:
         """在 full train graph 上训练全局权重, 只允许 labels_mask 内标签参与。"""
         ...
 
@@ -83,7 +93,9 @@ class Router(Protocol):
         """生成逐节点 alpha_vec、routed_mask 与 reason。"""
         ...
 
-    def fuse(self, decision: RoutingDecision, out_a: ChannelOutput, out_b: ChannelOutput) -> np.ndarray:
+    def fuse(
+        self, decision: RoutingDecision, out_a: ChannelOutput, out_b: ChannelOutput
+    ) -> np.ndarray:
         """按 decision 融合双通道, 校验 computed_mask(E505)。"""
         ...
 
@@ -106,7 +118,9 @@ class Evaluator(Protocol):
         """在指定 mask 上评估并写 test_touch_count。"""
         ...
 
-    def cross_check_sklearn(self, y_true: np.ndarray, y_score: np.ndarray) -> dict[str, float]:
+    def cross_check_sklearn(
+        self, y_true: np.ndarray, y_score: np.ndarray
+    ) -> dict[str, float]:
         """与 sklearn.metrics 对照, 差值 > 1e-12 抛 E605。"""
         ...
 
@@ -147,4 +161,11 @@ class SubgraphExtractor(Protocol):
         ...
 
 
-__all__ = ["Embedder", "GNNBackend", "Router", "Evaluator", "Generator", "SubgraphExtractor"]
+__all__ = [
+    "Embedder",
+    "Evaluator",
+    "GNNBackend",
+    "Generator",
+    "Router",
+    "SubgraphExtractor",
+]

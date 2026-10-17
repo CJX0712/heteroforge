@@ -15,4 +15,4 @@ from heteroforge.embed.channel_a import (
     available_backends,
 )
 
-__all__ = ["ChannelAEmbedder", "available_backends", "LADDER", "BACKEND_LICENSES"]
+__all__ = ["BACKEND_LICENSES", "LADDER", "ChannelAEmbedder", "available_backends"]

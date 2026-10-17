@@ -14,7 +14,7 @@ sys.path.insert(0, str(REPO_ROOT))
 # basetemp=data/.pytest-tmp 的父目录不入库(.gitignore), 干净克隆必须幂等创建。
 (REPO_ROOT / "data").mkdir(exist_ok=True)
 
-from heteroforge.data.synthetic import make_graph_data  # noqa: E402
+from heteroforge.data.synthetic import make_graph_data
 
 
 @pytest.fixture()

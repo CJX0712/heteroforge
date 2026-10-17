@@ -3,12 +3,23 @@
 from __future__ import annotations
 
 import json
+import math
 
 import pytest
 
 from heteroforge.core.config import build_run_config, config_hash
-from heteroforge.core.errors import HeteroForgeError, exit_code_for, is_warn_code, warn_message
-from heteroforge.core.utils import atomic_write_json, derive_seed, peak_rss_mb, stable_hash
+from heteroforge.core.errors import (
+    HeteroForgeError,
+    exit_code_for,
+    is_warn_code,
+    warn_message,
+)
+from heteroforge.core.utils import (
+    atomic_write_json,
+    derive_seed,
+    peak_rss_mb,
+    stable_hash,
+)
 
 
 class TestConfig:
@@ -92,4 +103,4 @@ class TestUtils:
 
     def test_peak_rss_positive_or_nan(self):
         value = peak_rss_mb()
-        assert value > 0 or value != value
+        assert value > 0 or math.isnan(value)

@@ -33,11 +33,17 @@ def run_chars() -> dict:
 def run_imports() -> dict:
     errors: list[str] = []
     modules = [
-        "heteroforge", "heteroforge.cli", "heteroforge.core.config",
-        "heteroforge.data.synthetic", "heteroforge.graph.homophily",
-        "heteroforge.embed.channel_a", "heteroforge.gnn.channel_b",
-        "heteroforge.router.haar", "heteroforge.hpo.tuner",
-        "heteroforge.eval.node_classification", "heteroforge.eval.link_prediction",
+        "heteroforge",
+        "heteroforge.cli",
+        "heteroforge.core.config",
+        "heteroforge.data.synthetic",
+        "heteroforge.graph.homophily",
+        "heteroforge.embed.channel_a",
+        "heteroforge.gnn.channel_b",
+        "heteroforge.router.haar",
+        "heteroforge.hpo.tuner",
+        "heteroforge.eval.node_classification",
+        "heteroforge.eval.link_prediction",
         "heteroforge.pipeline.benchmark",
     ]
     for name in modules:
@@ -50,15 +56,36 @@ def run_imports() -> dict:
 
 def run_pytest() -> dict:
     proc = subprocess.run(
-        [PY, "-m", "pytest", "-q", "-W", "ignore", "tests",
-         "--basetemp=data/.pytest-tmp", "-p", "no:cacheprovider"],
-        cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=1800,
-        env={"PYTHONIOENCODING": "utf-8", "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", ""),
-             "PATH": __import__("os").environ.get("PATH", "")},
+        [
+            PY,
+            "-m",
+            "pytest",
+            "-q",
+            "-W",
+            "ignore",
+            "tests",
+            "--basetemp=data/.pytest-tmp",
+            "-p",
+            "no:cacheprovider",
+        ],
+        check=False,
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=1800,
+        env={
+            "PYTHONIOENCODING": "utf-8",
+            "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", ""),
+            "PATH": __import__("os").environ.get("PATH", ""),
+        },
     )
     tail = (proc.stdout or "").strip().splitlines()[-3:]
     passed = "passed" in (proc.stdout or "")
-    return {"exit_code": proc.returncode, "tail": tail, "ok": proc.returncode == 0 and passed}
+    return {
+        "exit_code": proc.returncode,
+        "tail": tail,
+        "ok": proc.returncode == 0 and passed,
+    }
 
 
 def run_smoke(fast: bool) -> dict:
@@ -66,12 +93,14 @@ def run_smoke(fast: bool) -> dict:
     from heteroforge.pipeline.pipeline import HeteroForgePipeline
 
     n = 300 if fast else 800
-    cfg = build_run_config({
-        "seed": 42,
-        "data": {"n_nodes": n},
-        "embed": {"backend": "node2vec", "dim": 32},
-        "gnn": {"n_epochs": 20 if fast else 50},
-    })
+    cfg = build_run_config(
+        {
+            "seed": 42,
+            "data": {"n_nodes": n},
+            "embed": {"backend": "node2vec", "dim": 32},
+            "gnn": {"n_epochs": 20 if fast else 50},
+        }
+    )
     started = time.perf_counter()
     rows = HeteroForgePipeline(cfg).run_bucket(n, 0.5, "node_classification")
     systems = {r["system"]: r for r in rows if r.get("kind") != "meta"}
@@ -79,20 +108,26 @@ def run_smoke(fast: bool) -> dict:
         "n_nodes": n,
         "elapsed_sec": round(time.perf_counter() - started, 1),
         "macro_f1": {k: round(float(v["macro_f1"]), 4) for k, v in systems.items()},
-        "routed_fraction": round(float(
-            [r for r in rows if r.get("kind") == "meta"][0]["routed_fraction"]), 3),
-        "ok": all(v is not None for v in
-                  (s["macro_f1"] for s in systems.values())),
+        "routed_fraction": round(
+            float(next(r for r in rows if r.get("kind") == "meta")["routed_fraction"]),
+            3,
+        ),
+        "ok": all(v is not None for v in (s["macro_f1"] for s in systems.values())),
     }
 
 
 def run_gate() -> dict:
-    from heteroforge.pipeline.benchmark import DEFAULT_BUCKETS, haar_gate_check, run_benchmark
+    from heteroforge.pipeline.benchmark import (
+        haar_gate_check,
+        run_benchmark,
+    )
 
     buckets = [(800, 0.05), (800, 0.5), (800, 0.95)]
     payload = run_benchmark(
         {"seed": 42, "embed": {"backend": "node2vec"}, "gnn": {"n_epochs": 30}},
-        buckets=buckets, tasks=["node_classification"], enforce_gate=False,
+        buckets=buckets,
+        tasks=["node_classification"],
+        enforce_gate=False,
     )
     gate = haar_gate_check(payload["rows"])
     out = REPO_ROOT / "benchmark.json"
@@ -101,7 +136,8 @@ def run_gate() -> dict:
     save_benchmark(payload, out)
     gate["artifact"] = str(out)
     gate["ok"] = bool(
-        gate["noninferior_all"] and gate["mean_noninferior"]
+        gate["noninferior_all"]
+        and gate["mean_noninferior"]
         and gate["strictly_better_bucket_count"] >= 1
     )
     return gate
@@ -132,12 +168,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[{status}] {stage} ({result['elapsed_sec']}s)")
         if not result.get("ok"):
             break
-    report["all_pass"] = all(
-        s.get("ok") for s in report["stages"].values()
-    ) and len(report["stages"]) == len(STAGES)
+    report["all_pass"] = all(s.get("ok") for s in report["stages"].values()) and len(
+        report["stages"]
+    ) == len(STAGES)
     out = REPO_ROOT / "verify_report.json"
-    out.write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str),
-                   encoding="utf-8")
+    out.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+    )
     print(f"[{'OK' if report['all_pass'] else 'FAIL'}] verify report -> {out}")
     return 0 if report["all_pass"] else 1
 

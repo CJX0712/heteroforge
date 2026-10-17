@@ -7,7 +7,7 @@ import pytest
 
 from heteroforge.core.config import EmbedConfig, GNNConfig
 from heteroforge.core.errors import HeteroForgeError
-from heteroforge.embed.channel_a import ChannelAEmbedder, available_backends
+from heteroforge.embed.channel_a import ChannelAEmbedder
 from heteroforge.gnn.channel_b import SGCBackend, sknetwork_prop_features
 from heteroforge.gnn.subgraph import k_hop_subgraph, symmetric_normalize
 
@@ -23,7 +23,9 @@ class TestChannelA:
         assert out.fallback_used == (out.backend != "node2vec")
 
     def test_confidence_range(self, tiny_graph):
-        out = ChannelAEmbedder(preferred="spectral_rw", dim=16, seed=5).fit_predict(tiny_graph)
+        out = ChannelAEmbedder(preferred="spectral_rw", dim=16, seed=5).fit_predict(
+            tiny_graph
+        )
         assert out.computed_mask.all()
         assert (out.confidence >= 0).all() and (out.confidence <= 1.0 + 1e-9).all()
 
@@ -50,18 +52,24 @@ class TestChannelB:
 
     def test_full_vs_partial_bitwise_identical(self, tiny_graph):
         backend = SGCBackend(seed=1).fit(
-            tiny_graph, GNNConfig(seed=1, n_epochs=10), labels_mask=tiny_graph.train_mask
+            tiny_graph,
+            GNNConfig(seed=1, n_epochs=10),
+            labels_mask=tiny_graph.train_mask,
         )
         full = backend.predict(tiny_graph)
         nodes = np.arange(0, tiny_graph.num_nodes, 3)
         part = backend.predict(tiny_graph, nodes=nodes)
         assert part.computed_mask.sum() == nodes.size
-        diff = np.abs(part.proba[part.computed_mask] - full.proba[part.computed_mask]).max()
+        diff = np.abs(
+            part.proba[part.computed_mask] - full.proba[part.computed_mask]
+        ).max()
         assert diff <= 1e-9
 
     def test_proba_rows_sum_one(self, tiny_graph):
         backend = SGCBackend(seed=1).fit(
-            tiny_graph, GNNConfig(seed=1, n_epochs=10), labels_mask=tiny_graph.train_mask
+            tiny_graph,
+            GNNConfig(seed=1, n_epochs=10),
+            labels_mask=tiny_graph.train_mask,
         )
         out = backend.predict(tiny_graph)
         assert np.allclose(out.proba.sum(axis=1), 1.0, atol=1e-9)

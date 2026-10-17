@@ -56,10 +56,15 @@ def _build_sgc(num_classes: int, lr: float) -> GNNClassifier:
             self_embeddings=True,
             loss=CrossEntropy(),
         )
-        return GNNClassifier(layers=[layer], optimizer=ADAM(float(lr)), early_stopping=False)
+        return GNNClassifier(
+            layers=[layer], optimizer=ADAM(float(lr)), early_stopping=False
+        )
     except (ValueError, TypeError) as exc:
-        raise HeteroForgeError("E402", "SGC construction failed (loss/activation contract)",
-                               {"reason": str(exc)}) from exc
+        raise HeteroForgeError(
+            "E402",
+            "SGC construction failed (loss/activation contract)",
+            {"reason": str(exc)},
+        ) from exc
 
 
 def _masked_labels(labels: np.ndarray, labels_mask: np.ndarray) -> np.ndarray:
@@ -108,8 +113,9 @@ def sknetwork_prop_features(adjacency: Any, features: np.ndarray) -> np.ndarray:
 class SGCBackend:
     """单层 SGC 后端: 全图 fit 一次, 局部 k-hop forward。"""
 
-    def __init__(self, seed: int = 0, allow_fallback: bool = True,
-                 timeout_sec: float = 600.0) -> None:
+    def __init__(
+        self, seed: int = 0, allow_fallback: bool = True, timeout_sec: float = 600.0
+    ) -> None:
         self.seed = int(seed)
         self.allow_fallback = bool(allow_fallback)
         self.timeout_sec = float(timeout_sec)
@@ -133,7 +139,7 @@ class SGCBackend:
             raise HeteroForgeError("E401", "SGC backend is not fitted")
         return self._model
 
-    def fit(self, graph: Any, config: GNNConfig, labels_mask: np.ndarray) -> "SGCBackend":
+    def fit(self, graph: Any, config: GNNConfig, labels_mask: np.ndarray) -> SGCBackend:
         """在 full train graph 上训练全局权重; 只有 labels_mask 内标签参与。
 
         Raises:
@@ -154,9 +160,11 @@ class SGCBackend:
             )
         except HeteroForgeError:
             raise
-        except Exception as exc:  # noqa: BLE001 - 归一为 E401
+        except Exception as exc:
             if not self.allow_fallback:
-                raise HeteroForgeError("E401", "SGC fit failed", {"reason": str(exc)}) from exc
+                raise HeteroForgeError(
+                    "E401", "SGC fit failed", {"reason": str(exc)}
+                ) from exc
             self._backend_id = "prop_lr"
             return self._fit_prop_lr(graph, config, labels_mask)
         if time.perf_counter() - started > self.timeout_sec:
@@ -182,7 +190,9 @@ class SGCBackend:
             }
         return self._prop_cache["matrix"]  # type: ignore[no-any-return]
 
-    def _fit_prop_lr(self, graph: Any, config: GNNConfig, labels_mask: np.ndarray) -> "SGCBackend":
+    def _fit_prop_lr(
+        self, graph: Any, config: GNNConfig, labels_mask: np.ndarray
+    ) -> SGCBackend:
         """prop_lr 兜底: k 次归一化传播 + LogisticRegression(纯 scipy/sklearn)。"""
         self._model = None
         self._prop = PropLRBackend(seed=int(config.seed or self.seed))
@@ -221,7 +231,9 @@ class SGCBackend:
         start_peak_sampling()
         warnings: list[str] = []
         if self._backend_id == "prop_lr":
-            out = self._prop.predict(graph, nodes=nodes, k_hop=k_hop, z_a_fallback=z_a_fallback)
+            out = self._prop.predict(
+                graph, nodes=nodes, k_hop=k_hop, z_a_fallback=z_a_fallback
+            )
             out.warnings = sorted(set(list(out.warnings) + ["GNN_FALLBACK_USED"]))
             return out
         model = self._assert_fitted()
@@ -237,7 +249,11 @@ class SGCBackend:
             proba = np.zeros((n, self._num_classes), dtype=np.float64)
             computed = np.zeros(n, dtype=bool)
             targets = np.unique(np.asarray(nodes, dtype=np.int64))
-            logits = prop_x[targets] @ weight if bias is None else prop_x[targets] @ weight + bias
+            logits = (
+                prop_x[targets] @ weight
+                if bias is None
+                else prop_x[targets] @ weight + bias
+            )
             proba[targets] = _stable_softmax(logits)
             computed[targets] = True
         if proba.shape[0] != n:
@@ -250,7 +266,9 @@ class SGCBackend:
             rowsum = proba[computed].sum(axis=1)
             drift = float(np.max(np.abs(rowsum - 1.0)))
             if drift > 1e-6:
-                raise HeteroForgeError("E405", "proba rows must sum to 1", {"max_drift": drift})
+                raise HeteroForgeError(
+                    "E405", "proba rows must sum to 1", {"max_drift": drift}
+                )
         return ChannelOutput(
             channel="B",
             backend=self._backend_id,
@@ -260,14 +278,19 @@ class SGCBackend:
             embedding=np.ascontiguousarray(proba.astype(np.float64)),
             node_ids=np.arange(n, dtype=np.int64),
             proba=np.ascontiguousarray(proba.astype(np.float64)),
-            confidence=_confidence_from(proba) if nodes is None else self._masked_confidence(proba, computed),
+            confidence=_confidence_from(proba)
+            if nodes is None
+            else self._masked_confidence(proba, computed),
             computed_mask=np.ascontiguousarray(computed),
             dim=int(self._num_classes),
             seed=self.seed,
             elapsed_sec=float(time.perf_counter() - started),
             peak_rss_mb=float(peak_rss_mb()),
-            params={"k_hop": int(k_hop), "n_epochs": getattr(self, "_n_epochs", 0),
-                    "layers": len(model.layers)},
+            params={
+                "k_hop": int(k_hop),
+                "n_epochs": getattr(self, "_n_epochs", 0),
+                "layers": len(model.layers),
+            },
             warnings=sorted(set(warnings)),
         )
 
@@ -309,7 +332,9 @@ class PropLRBackend:
             x = np.ascontiguousarray(adj @ x)
         return x
 
-    def fit(self, graph: Any, config: GNNConfig, labels_mask: np.ndarray) -> "PropLRBackend":
+    def fit(
+        self, graph: Any, config: GNNConfig, labels_mask: np.ndarray
+    ) -> PropLRBackend:
         """在 train 标签上拟合传播特征 + LR。"""
         graph.validate()
         mask = np.asarray(labels_mask, dtype=bool)
@@ -317,9 +342,13 @@ class PropLRBackend:
         y = np.asarray(graph.labels, dtype=np.int64)
         self._num_classes = max(2, graph.num_classes())
         if mask.sum() < 4 or np.unique(y[mask]).size < 2:
-            raise HeteroForgeError("E401", "prop_lr needs at least two labelled classes")
+            raise HeteroForgeError(
+                "E401", "prop_lr needs at least two labelled classes"
+            )
         self._scaler = StandardScaler().fit(propagated[mask])
-        self._model = LogisticRegression(max_iter=1000, random_state=self.seed, n_jobs=1)
+        self._model = LogisticRegression(
+            max_iter=1000, random_state=self.seed, n_jobs=1
+        )
         self._model.fit(self._scaler.transform(propagated[mask]), y[mask])
         return self
 

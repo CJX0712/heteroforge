@@ -24,13 +24,13 @@ from heteroforge.data.synthetic import (
 )
 
 __all__ = [
+    "EdgeSplit",
     "SyntheticGraph",
     "generate_graph",
+    "load_graph_data",
     "make_graph_data",
     "save_graph_data",
-    "load_graph_data",
-    "split_nodes",
     "split_edges",
     "split_hash",
-    "EdgeSplit",
+    "split_nodes",
 ]

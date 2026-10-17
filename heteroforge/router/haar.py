@@ -52,7 +52,10 @@ def assert_no_test_access(*used_fields: str) -> None:
         HeteroForgeError: E504, 出现 test 相关字段。
     """
     for name in used_fields:
-        if str(name).strip().lower() in _FORBIDDEN_FIELDS or "test" in str(name).lower():
+        if (
+            str(name).strip().lower() in _FORBIDDEN_FIELDS
+            or "test" in str(name).lower()
+        ):
             raise HeteroForgeError(
                 "E504", "router must not access test data", {"field": str(name)}
             )
@@ -137,7 +140,8 @@ class HAARRouter:
             budget_max = int(np.ceil(float(p.budget_ratio) * n))
             if budget_max < 1:
                 raise HeteroForgeError(
-                    "E503", "budget too small to route any node",
+                    "E503",
+                    "budget too small to route any node",
                     {"budget_ratio": float(p.budget_ratio), "n": n},
                 )
 
@@ -148,14 +152,21 @@ class HAARRouter:
 
             low_conf = np.flatnonzero((confidence < float(p.threshold)) & ~routed_mask)
             if isolated.size + low_conf.size > budget_max:
-                isolated_set = set(int(i) for i in isolated.tolist())
-                order = np.argsort(np.where(np.isfinite(confidence), confidence, np.inf), kind="stable")
-                cand = [int(i) for i in order
-                        if int(i) in isolated_set or confidence[int(i)] < float(p.threshold)]
+                isolated_set = {int(i) for i in isolated.tolist()}
+                order = np.argsort(
+                    np.where(np.isfinite(confidence), confidence, np.inf), kind="stable"
+                )
+                cand = [
+                    int(i)
+                    for i in order
+                    if int(i) in isolated_set or confidence[int(i)] < float(p.threshold)
+                ]
                 keep = set(cand[:budget_max])
                 for i in cand:
                     routed_mask[i] = i in keep
-                    reason[i] = REASON_DEGREE_ZERO if i in isolated_set else REASON_LOW_CONF
+                    reason[i] = (
+                        REASON_DEGREE_ZERO if i in isolated_set else REASON_LOW_CONF
+                    )
                     alpha_vec[i] = alpha_base
                 warnings.append("BUDGET_TRUNCATED")
             else:
@@ -212,4 +223,6 @@ class HAARRouter:
         Returns:
             (n, d) 融合矩阵。
         """
-        return decision.fuse(out_a.fusion_matrix(), out_b.fusion_matrix(), out_b.computed_mask)
+        return decision.fuse(
+            out_a.fusion_matrix(), out_b.fusion_matrix(), out_b.computed_mask
+        )

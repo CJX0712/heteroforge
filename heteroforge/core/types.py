@@ -85,13 +85,17 @@ class GraphData:
             raise HeteroForgeError("E207", "adjacency must be scipy csr_matrix")
         self.adjacency = self.adjacency.tocsr().astype(np.float64)
         if self.adjacency.shape != (n, n):
-            raise HeteroForgeError("E207", "adjacency shape mismatch", {"shape": self.adjacency.shape})
+            raise HeteroForgeError(
+                "E207", "adjacency shape mismatch", {"shape": self.adjacency.shape}
+            )
         diff = self.adjacency - self.adjacency.T
         if abs(diff).max() > 1e-12:
             raise HeteroForgeError("E207", "adjacency must be symmetric")
         if abs(self.adjacency.diagonal()).max() > 1e-12:
             raise HeteroForgeError("E207", "adjacency must not contain self loops")
-        self.features = np.ascontiguousarray(np.asarray(self.features, dtype=np.float64))
+        self.features = np.ascontiguousarray(
+            np.asarray(self.features, dtype=np.float64)
+        )
         if self.features.shape[0] != n:
             raise HeteroForgeError("E208", "features row count mismatch")
         if not np.isfinite(self.features).all():
@@ -129,8 +133,10 @@ class GraphData:
 
     def edge_set(self, undirected: bool = True) -> set[tuple[int, int]]:
         """返回边集。undirected=True 时规范为 (min,max)。"""
-        pairs = canonical_edges(self.adjacency) if undirected else np.stack(
-            np.nonzero(self.adjacency), axis=1
+        pairs = (
+            canonical_edges(self.adjacency)
+            if undirected
+            else np.stack(np.nonzero(self.adjacency), axis=1)
         )
         return {(int(a), int(b)) for a, b in pairs}
 
@@ -147,7 +153,7 @@ class GraphData:
         sub_adj = self.adjacency[idx][:, idx]
         return sp.csr_matrix(sub_adj), np.ascontiguousarray(self.features[idx])
 
-    def to_nx(self) -> "Any":
+    def to_nx(self) -> Any:
         """转换为 networkx.Graph(延迟 import, 避免内核层硬依赖)。"""
         import networkx as nx
 
@@ -185,7 +191,11 @@ class HomophilyReport:
         assort = float(self.degree_assortativity)
         assort = 0.0 if not np.isfinite(assort) else assort
         return np.asarray(
-            [float(self.edge_homophily), float(self.node_homophily), (assort + 1.0) / 2.0],
+            [
+                float(self.edge_homophily),
+                float(self.node_homophily),
+                (assort + 1.0) / 2.0,
+            ],
             dtype=np.float64,
         )
 
@@ -213,7 +223,9 @@ class ChannelOutput:
 
     def validate(self, num_nodes: int | None = None) -> None:
         """校验 shape、有限性与节点顺序; 违反抛 E3xx/E4xx。"""
-        self.embedding = np.ascontiguousarray(np.asarray(self.embedding, dtype=np.float64))
+        self.embedding = np.ascontiguousarray(
+            np.asarray(self.embedding, dtype=np.float64)
+        )
         if self.embedding.ndim != 2:
             raise HeteroForgeError("E304", "embedding must be 2-D")
         if not np.isfinite(self.embedding).all():
@@ -224,8 +236,12 @@ class ChannelOutput:
         self.node_ids = np.asarray(self.node_ids, dtype=np.int64)
         if not np.array_equal(self.node_ids, np.arange(n)):
             raise HeteroForgeError("E209", "node_ids must equal arange(n)")
-        self.computed_mask = np.ascontiguousarray(np.asarray(self.computed_mask, dtype=bool))
-        self.confidence = np.ascontiguousarray(np.asarray(self.confidence, dtype=np.float64))
+        self.computed_mask = np.ascontiguousarray(
+            np.asarray(self.computed_mask, dtype=bool)
+        )
+        self.confidence = np.ascontiguousarray(
+            np.asarray(self.confidence, dtype=np.float64)
+        )
         if self.confidence.shape != (n,):
             raise HeteroForgeError("E304", "confidence shape mismatch")
         if self.proba is not None:
@@ -263,19 +279,25 @@ class RoutingDecision:
         """校验模式、reason 枚举与 alpha 边界; 违反抛 E5xx。"""
         if self.mode not in ROUTING_MODES:
             raise HeteroForgeError("E502", "unknown routing mode", {"mode": self.mode})
-        self.alpha_vec = np.ascontiguousarray(np.asarray(self.alpha_vec, dtype=np.float64))
+        self.alpha_vec = np.ascontiguousarray(
+            np.asarray(self.alpha_vec, dtype=np.float64)
+        )
         if self.alpha_vec.min() < -1e-12 or self.alpha_vec.max() > 1.0 + 1e-12:
             raise HeteroForgeError("E501", "alpha_vec out of [0,1]")
         self.reason = np.asarray(self.reason, dtype="<U32")
         bad = sorted({str(r) for r in self.reason} - set(ROUTE_REASONS))
         if bad:
             raise HeteroForgeError("E502", "unknown route reason", {"reasons": bad})
-        self.routed_mask = np.ascontiguousarray(np.asarray(self.routed_mask, dtype=bool))
+        self.routed_mask = np.ascontiguousarray(
+            np.asarray(self.routed_mask, dtype=bool)
+        )
         n = self.alpha_vec.shape[0]
         if self.routed_mask.shape != (n,) or self.reason.shape != (n,):
             raise HeteroForgeError("E502", "routing arrays shape mismatch")
 
-    def fuse(self, z_a: np.ndarray, z_b: np.ndarray, computed_mask: np.ndarray) -> np.ndarray:
+    def fuse(
+        self, z_a: np.ndarray, z_b: np.ndarray, computed_mask: np.ndarray
+    ) -> np.ndarray:
         """按 alpha_vec 融合两个通道; 未计算的行一律拒绝读取(E505)。
 
         Args:
@@ -290,7 +312,9 @@ class RoutingDecision:
         z_a = np.asarray(z_a, dtype=np.float64)
         z_b = np.asarray(z_b, dtype=np.float64)
         if z_a.shape != z_b.shape:
-            raise HeteroForgeError("E505", "fusion shape mismatch", {"a": z_a.shape, "b": z_b.shape})
+            raise HeteroForgeError(
+                "E505", "fusion shape mismatch", {"a": z_a.shape, "b": z_b.shape}
+            )
         computed = np.ascontiguousarray(np.asarray(computed_mask, dtype=bool))
         missing = np.flatnonzero(self.routed_mask & ~computed)
         if missing.size:
